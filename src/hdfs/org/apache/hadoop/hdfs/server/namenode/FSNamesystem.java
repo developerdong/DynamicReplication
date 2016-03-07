@@ -4428,7 +4428,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
          */
         private boolean insertFileIntoNewSet(String src, int srcReplication, long srcAccessTime) throws IOException{
             //遍历比srcReplication副本数大的集合，尝试插入
-            for(int rep = srcReplication+1; rep <= maxDynamicReplication; rep++){
+            for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
                 ArrayList<String> replicationSet = replicationSets.get(rep);
                 //集合为空或者访问时间大于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
