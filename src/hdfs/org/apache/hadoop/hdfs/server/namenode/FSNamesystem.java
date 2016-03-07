@@ -969,6 +969,40 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         return true;
     }
 
+    private synchronized boolean setReplicationInternalWithoutPermissionCheck(String src,
+                                                        short replication
+    ) throws IOException {
+        if (isInSafeMode())
+            throw new SafeModeException("Cannot set replication for " + src, safeMode);
+        verifyReplication(src, replication, null);
+
+
+        int[] oldReplication = new int[1];
+        Block[] fileBlocks;
+        fileBlocks = dir.setReplication(src, replication, oldReplication);
+        if (fileBlocks == null)  // file not found or is a directory
+            return false;
+        int oldRepl = oldReplication[0];
+        if (oldRepl == replication) // the same replication
+            return true;
+
+        // update needReplication priority queues
+        for (int idx = 0; idx < fileBlocks.length; idx++)
+            updateNeededReplications(fileBlocks[idx], 0, replication - oldRepl);
+
+        if (oldRepl > replication) {
+            // old replication > the new one; need to remove copies
+            LOG.info("Reducing replication for file " + src
+                    + ". New replication is " + replication);
+            for (int idx = 0; idx < fileBlocks.length; idx++)
+                processOverReplicatedBlock(fileBlocks[idx], replication, null, null);
+        } else { // replication factor is increased
+            LOG.info("Increasing replication for file " + src
+                    + ". New replication is " + replication);
+        }
+        return true;
+    }
+
     long getPreferredBlockSize(String filename) throws IOException {
         if (isPermissionEnabled) {
             checkTraverse(filename);
@@ -4411,7 +4445,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     ArrayList<String> halfReplicationSet = (ArrayList<String>) replicationSet.subList(0,replicationSet.size()/2);
                     //这一半文件的副本数都减一
                     for(String file : halfReplicationSet){
-                        setReplicationInternal(file,(short)(rep - 1));
+                        setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
                     }
                     //从原集合移除这一半文件
                     replicationSet.removeAll(halfReplicationSet);
@@ -4445,13 +4479,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     * 如果记录了EditLog，各个文件的副本数有高有低，但是动态副本类中
                     * 集合并没有相应的记录会出问题，后果包括如果文件不被访问，
                     * 文件的副本数永远不会减少*/
-                    setReplicationInternal(src,(short)rep);
+                    setReplicationInternalWithoutPermissionCheck(src,(short)rep);
                     return true;
                 }
                 else if(srcAccessTime > dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
                     replicationSet.add(src);
                     NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    setReplicationInternal(src,(short)rep);
+                    setReplicationInternalWithoutPermissionCheck(src,(short)rep);
                     return true;
                 }
             }
