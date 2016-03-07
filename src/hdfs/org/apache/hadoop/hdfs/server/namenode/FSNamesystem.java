@@ -4390,6 +4390,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 //插入成功且副本数不是最小副本数则在原集合中删除
                 if(srcReplication > minDynamicReplication) {
                     replicationSets.get(srcReplication).remove(src);
+                    NameNode.allocationLog.info(src + " was removed from set " + srcReplication);
                     //如果是最小文件则更新最小文件
                     if(minAccessTimeFile.get(srcReplication).equals(src)) {
                         updateMinAccessTimeFileOfSet(srcReplication);
@@ -4434,8 +4435,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 if(replicationSet.isEmpty()){
                     //插入新集合
                     replicationSet.add(src);
+                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
                     //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
                     minAccessTimeFile.put(rep, src);
+                    NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
                     /*这里使用internal方法的原因是internal方法不记录EditLog，
                     * 假如NameNode崩溃，重新启动时各个文件的副本数会重新设置为3，
                     * 而动态副本类中的文件集合会重新初始化，两者正好相适应，
@@ -4447,6 +4450,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 }
                 else if(srcAccessTime > dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
                     replicationSet.add(src);
+                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
                     setReplicationInternal(src,(short)rep);
                     return true;
                 }
@@ -4472,6 +4476,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             }
             if(!newFile.equals(oldFile)){
                 minAccessTimeFile.put(rep, newFile);
+                NameNode.allocationLog.info(newFile + " is the minAccessTimeFile of set " + rep);
                 return true;
             }
             return false;
