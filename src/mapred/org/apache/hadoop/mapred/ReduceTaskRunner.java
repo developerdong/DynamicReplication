@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,29 +23,29 @@ import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 
 /** Runs a reduce task. */
 class ReduceTaskRunner extends TaskRunner {
-  
-  public ReduceTaskRunner(TaskInProgress task, TaskTracker tracker, 
-                          JobConf conf) throws IOException {
-    
-    super(task, tracker, conf);
-  }
 
-  /** Assemble all of the map output files */
-  public boolean prepare() throws IOException {
-    if (!super.prepare()) {
-      return false;
+    public ReduceTaskRunner(TaskInProgress task, TaskTracker tracker,
+                            JobConf conf) throws IOException {
+
+        super(task, tracker, conf);
     }
-    
-    // cleanup from failures
-    mapOutputFile.removeAll(getTask().getTaskID());
-    return true;
-  }
-  
-  
-  /** Delete all of the temporary map output files. */
-  public void close() throws IOException {
-    LOG.info(getTask()+" done; removing files.");
-    getTask().getProgress().setStatus("closed");
-    mapOutputFile.removeAll(getTask().getTaskID());
-  }
+
+    /** Assemble all of the map output files */
+    public boolean prepare() throws IOException {
+        if (!super.prepare()) {
+            return false;
+        }
+
+        // cleanup from failures
+        mapOutputFile.removeAll(getTask().getTaskID());
+        return true;
+    }
+
+
+    /** Delete all of the temporary map output files. */
+    public void close() throws IOException {
+        LOG.info(getTask() + " done; removing files.");
+        getTask().getProgress().setStatus("closed");
+        mapOutputFile.removeAll(getTask().getTaskID());
+    }
 }

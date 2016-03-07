@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,61 +33,62 @@ import org.apache.hadoop.security.UserGroupInformation;
  * on connection establishment.
  */
 class ConnectionHeader implements Writable {
-  public static final Log LOG = LogFactory.getLog(ConnectionHeader.class);
-  
-  private String protocol;
-  private UserGroupInformation ugi = new UnixUserGroupInformation();
-  
-  public ConnectionHeader() {}
-  
-  /**
-   * Create a new {@link ConnectionHeader} with the given <code>protocol</code>
-   * and {@link UserGroupInformation}. 
-   * @param protocol protocol used for communication between the IPC client
-   *                 and the server
-   * @param ugi {@link UserGroupInformation} of the client communicating with
-   *            the server
-   */
-  public ConnectionHeader(String protocol, UserGroupInformation ugi) {
-    this.protocol = protocol;
-    this.ugi = ugi;
-  }
+    public static final Log LOG = LogFactory.getLog(ConnectionHeader.class);
 
-  @Override
-  public void readFields(DataInput in) throws IOException {
-    protocol = Text.readString(in);
-    if (protocol.isEmpty()) {
-      protocol = null;
+    private String protocol;
+    private UserGroupInformation ugi = new UnixUserGroupInformation();
+
+    public ConnectionHeader() {
     }
-    
-    boolean ugiPresent = in.readBoolean();
-    if (ugiPresent) {
-      ugi.readFields(in);
-    } else {
-      ugi = null;
+
+    /**
+     * Create a new {@link ConnectionHeader} with the given <code>protocol</code>
+     * and {@link UserGroupInformation}.
+     * @param protocol protocol used for communication between the IPC client
+     *                 and the server
+     * @param ugi {@link UserGroupInformation} of the client communicating with
+     *            the server
+     */
+    public ConnectionHeader(String protocol, UserGroupInformation ugi) {
+        this.protocol = protocol;
+        this.ugi = ugi;
     }
-  }
 
-  @Override
-  public void write(DataOutput out) throws IOException {
-    Text.writeString(out, (protocol == null) ? "" : protocol);
-    if (ugi != null) {
-      out.writeBoolean(true);
-      ugi.write(out);
-    } else {
-      out.writeBoolean(false);
+    @Override
+    public void readFields(DataInput in) throws IOException {
+        protocol = Text.readString(in);
+        if (protocol.isEmpty()) {
+            protocol = null;
+        }
+
+        boolean ugiPresent = in.readBoolean();
+        if (ugiPresent) {
+            ugi.readFields(in);
+        } else {
+            ugi = null;
+        }
     }
-  }
 
-  public String getProtocol() {
-    return protocol;
-  }
+    @Override
+    public void write(DataOutput out) throws IOException {
+        Text.writeString(out, (protocol == null) ? "" : protocol);
+        if (ugi != null) {
+            out.writeBoolean(true);
+            ugi.write(out);
+        } else {
+            out.writeBoolean(false);
+        }
+    }
 
-  public UserGroupInformation getUgi() {
-    return ugi;
-  }
+    public String getProtocol() {
+        return protocol;
+    }
 
-  public String toString() {
-    return protocol + "-" + ugi;
-  }
+    public UserGroupInformation getUgi() {
+        return ugi;
+    }
+
+    public String toString() {
+        return protocol + "-" + ugi;
+    }
 }

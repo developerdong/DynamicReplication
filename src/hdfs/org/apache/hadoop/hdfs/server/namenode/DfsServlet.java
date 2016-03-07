@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -41,58 +41,57 @@ import org.apache.hadoop.security.UserGroupInformation;
  * A base class for the servlets in DFS.
  */
 abstract class DfsServlet extends HttpServlet {
-  /** For java.io.Serializable */
-  private static final long serialVersionUID = 1L;
+    /** For java.io.Serializable */
+    private static final long serialVersionUID = 1L;
 
-  static final Log LOG = LogFactory.getLog(DfsServlet.class.getCanonicalName());
+    static final Log LOG = LogFactory.getLog(DfsServlet.class.getCanonicalName());
 
-  /** Get {@link UserGroupInformation} from request */
-  protected UnixUserGroupInformation getUGI(HttpServletRequest request) {
-    String ugi = request.getParameter("ugi");
-    try {
-      return new UnixUserGroupInformation(ugi.split(","));
+    /** Get {@link UserGroupInformation} from request */
+    protected UnixUserGroupInformation getUGI(HttpServletRequest request) {
+        String ugi = request.getParameter("ugi");
+        try {
+            return new UnixUserGroupInformation(ugi.split(","));
+        } catch (Exception e) {
+            LOG.warn("Invalid ugi (= " + ugi + ")");
+        }
+        return JspHelper.webUGI;
     }
-    catch(Exception e) {
-      LOG.warn("Invalid ugi (= " + ugi + ")");
+
+    /**
+     * Create a {@link NameNode} proxy from the current {@link ServletContext}.
+     */
+    protected ClientProtocol createNameNodeProxy(UnixUserGroupInformation ugi
+    ) throws IOException {
+        ServletContext context = getServletContext();
+        InetSocketAddress nnAddr = (InetSocketAddress) context.getAttribute("name.node.address");
+        Configuration conf = new Configuration(
+                (Configuration) context.getAttribute("name.conf"));
+        UnixUserGroupInformation.saveToConf(conf,
+                UnixUserGroupInformation.UGI_PROPERTY_NAME, ugi);
+        return DFSClient.createNamenode(nnAddr, conf);
     }
-    return JspHelper.webUGI;
-  }
 
-  /**
-   * Create a {@link NameNode} proxy from the current {@link ServletContext}. 
-   */
-  protected ClientProtocol createNameNodeProxy(UnixUserGroupInformation ugi
-      ) throws IOException {
-    ServletContext context = getServletContext();
-    InetSocketAddress nnAddr = (InetSocketAddress)context.getAttribute("name.node.address");
-    Configuration conf = new Configuration(
-        (Configuration)context.getAttribute("name.conf"));
-    UnixUserGroupInformation.saveToConf(conf,
-        UnixUserGroupInformation.UGI_PROPERTY_NAME, ugi);
-    return DFSClient.createNamenode(nnAddr, conf);
-  }
-
-  /** Create a URI for redirecting request */
-  protected URI createRedirectUri(String servletpath, UserGroupInformation ugi,
-      DatanodeID host, HttpServletRequest request) throws URISyntaxException {
-    final String hostname = host instanceof DatanodeInfo?
-        ((DatanodeInfo)host).getHostName(): host.getHost();
-    final String scheme = request.getScheme();
-    final int port = "https".equals(scheme)?
-        (Integer)getServletContext().getAttribute("datanode.https.port")
-        : host.getInfoPort();
-    final String filename = request.getPathInfo();
-    return new URI(scheme, null, hostname, port, servletpath,
-        "filename=" + filename + "&ugi=" + ugi, null);
-  }
-
-  /** Get filename from the request */
-  protected String getFilename(HttpServletRequest request,
-      HttpServletResponse response) throws IOException {
-    final String filename = request.getParameter("filename");
-    if (filename == null || filename.length() == 0) {
-      throw new IOException("Invalid filename");
+    /** Create a URI for redirecting request */
+    protected URI createRedirectUri(String servletpath, UserGroupInformation ugi,
+                                    DatanodeID host, HttpServletRequest request) throws URISyntaxException {
+        final String hostname = host instanceof DatanodeInfo ?
+                ((DatanodeInfo) host).getHostName() : host.getHost();
+        final String scheme = request.getScheme();
+        final int port = "https".equals(scheme) ?
+                (Integer) getServletContext().getAttribute("datanode.https.port")
+                : host.getInfoPort();
+        final String filename = request.getPathInfo();
+        return new URI(scheme, null, hostname, port, servletpath,
+                "filename=" + filename + "&ugi=" + ugi, null);
     }
-    return filename;
-  }
+
+    /** Get filename from the request */
+    protected String getFilename(HttpServletRequest request,
+                                 HttpServletResponse response) throws IOException {
+        final String filename = request.getParameter("filename");
+        if (filename == null || filename.length() == 0) {
+            throw new IOException("Invalid filename");
+        }
+        return filename;
+    }
 }

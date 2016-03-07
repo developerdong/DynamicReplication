@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,23 +24,23 @@ import org.apache.hadoop.mapred.TaskTracker.TaskInProgress;
 /** Runs a map task. */
 class MapTaskRunner extends TaskRunner {
 
-  public MapTaskRunner(TaskInProgress task, TaskTracker tracker, JobConf conf) {
-    super(task, tracker, conf);
-  }
-  
-  /** Delete any temporary files from previous failed attempts. */
-  public boolean prepare() throws IOException {
-    if (!super.prepare()) {
-      return false;
+    public MapTaskRunner(TaskInProgress task, TaskTracker tracker, JobConf conf) {
+        super(task, tracker, conf);
     }
-    
-    mapOutputFile.removeAll(getTask().getTaskID());
-    return true;
-  }
 
-  /** Delete all of the temporary map output files. */
-  public void close() throws IOException {
-    LOG.info(getTask()+" done; removing files.");
-    mapOutputFile.removeAll(getTask().getTaskID());
-  }
+    /** Delete any temporary files from previous failed attempts. */
+    public boolean prepare() throws IOException {
+        if (!super.prepare()) {
+            return false;
+        }
+
+        mapOutputFile.removeAll(getTask().getTaskID());
+        return true;
+    }
+
+    /** Delete all of the temporary map output files. */
+    public void close() throws IOException {
+        LOG.info(getTask() + " done; removing files.");
+        mapOutputFile.removeAll(getTask().getTaskID());
+    }
 }

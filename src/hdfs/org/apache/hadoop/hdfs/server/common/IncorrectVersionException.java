@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,20 +24,20 @@ import org.apache.hadoop.hdfs.protocol.FSConstants;
 /**
  * The exception is thrown when external version does not match 
  * current version of the appication.
- * 
+ *
  */
 public class IncorrectVersionException extends IOException {
 
-  public IncorrectVersionException(int versionReported, String ofWhat) {
-    this(versionReported, ofWhat, FSConstants.LAYOUT_VERSION);
-  }
-  
-  public IncorrectVersionException(int versionReported,
-                                   String ofWhat,
-                                   int versionExpected) {
-    super("Unexpected version " 
-          + (ofWhat==null ? "" : "of " + ofWhat) + ". Reported: "
-          + versionReported + ". Expecting = " + versionExpected + ".");
-  }
+    public IncorrectVersionException(int versionReported, String ofWhat) {
+        this(versionReported, ofWhat, FSConstants.LAYOUT_VERSION);
+    }
+
+    public IncorrectVersionException(int versionReported,
+                                     String ofWhat,
+                                     int versionExpected) {
+        super("Unexpected version "
+                + (ofWhat == null ? "" : "of " + ofWhat) + ". Reported: "
+                + versionReported + ". Expecting = " + versionExpected + ".");
+    }
 
 }

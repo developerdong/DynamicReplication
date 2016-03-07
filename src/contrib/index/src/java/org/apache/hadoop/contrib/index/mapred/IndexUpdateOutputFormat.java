@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,31 +35,31 @@ import org.apache.hadoop.util.Progressable;
  */
 public class IndexUpdateOutputFormat extends FileOutputFormat<Shard, Text> {
 
-  /* (non-Javadoc)
-   * @see FileOutputFormat#getRecordWriter(FileSystem, JobConf, String, Progressable)
-   */
-  public RecordWriter<Shard, Text> getRecordWriter(final FileSystem fs,
-      JobConf job, String name, final Progressable progress)
-      throws IOException {
+    /* (non-Javadoc)
+     * @see FileOutputFormat#getRecordWriter(FileSystem, JobConf, String, Progressable)
+     */
+    public RecordWriter<Shard, Text> getRecordWriter(final FileSystem fs,
+                                                     JobConf job, String name, final Progressable progress)
+            throws IOException {
 
-    final Path perm = new Path(getWorkOutputPath(job), name);
+        final Path perm = new Path(getWorkOutputPath(job), name);
 
-    return new RecordWriter<Shard, Text>() {
-      public void write(Shard key, Text value) throws IOException {
-        assert (IndexUpdateReducer.DONE.equals(value));
+        return new RecordWriter<Shard, Text>() {
+            public void write(Shard key, Text value) throws IOException {
+                assert (IndexUpdateReducer.DONE.equals(value));
 
-        String shardName = key.getDirectory();
-        shardName = shardName.replace("/", "_");
+                String shardName = key.getDirectory();
+                shardName = shardName.replace("/", "_");
 
-        Path doneFile =
-            new Path(perm, IndexUpdateReducer.DONE + "_" + shardName);
-        if (!fs.exists(doneFile)) {
-          fs.createNewFile(doneFile);
-        }
-      }
+                Path doneFile =
+                        new Path(perm, IndexUpdateReducer.DONE + "_" + shardName);
+                if (!fs.exists(doneFile)) {
+                    fs.createNewFile(doneFile);
+                }
+            }
 
-      public void close(final Reporter reporter) throws IOException {
-      }
-    };
-  }
+            public void close(final Reporter reporter) throws IOException {
+            }
+        };
+    }
 }

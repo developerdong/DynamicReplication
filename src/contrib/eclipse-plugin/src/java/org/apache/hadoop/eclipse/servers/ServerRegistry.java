@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,169 +35,169 @@ import org.eclipse.jface.dialogs.MessageDialog;
 
 /**
  * Register of Hadoop locations.
- * 
+ *
  * Each location corresponds to a Hadoop {@link Configuration} stored as an
  * XML file in the workspace plug-in configuration directory:
  * <p>
  * <tt>
  * &lt;workspace-dir&gt;/.metadata/.plugins/org.apache.hadoop.eclipse/locations/*.xml
  * </tt>
- * 
+ *
  */
 public class ServerRegistry {
 
-  private static final ServerRegistry INSTANCE = new ServerRegistry();
+    private static final ServerRegistry INSTANCE = new ServerRegistry();
 
-  public static final int SERVER_ADDED = 0;
+    public static final int SERVER_ADDED = 0;
 
-  public static final int SERVER_REMOVED = 1;
+    public static final int SERVER_REMOVED = 1;
 
-  public static final int SERVER_STATE_CHANGED = 2;
+    public static final int SERVER_STATE_CHANGED = 2;
 
-  private final File baseDir =
-      Activator.getDefault().getStateLocation().toFile();
+    private final File baseDir =
+            Activator.getDefault().getStateLocation().toFile();
 
-  private final File saveDir = new File(baseDir, "locations");
+    private final File saveDir = new File(baseDir, "locations");
 
-  private ServerRegistry() {
-    if (saveDir.exists() && !saveDir.isDirectory())
-      saveDir.delete();
-    if (!saveDir.exists())
-      saveDir.mkdirs();
+    private ServerRegistry() {
+        if (saveDir.exists() && !saveDir.isDirectory())
+            saveDir.delete();
+        if (!saveDir.exists())
+            saveDir.mkdirs();
 
-    load();
-  }
-
-  private Map<String, HadoopServer> servers;
-
-  private Set<IHadoopServerListener> listeners =
-      new HashSet<IHadoopServerListener>();
-
-  public static ServerRegistry getInstance() {
-    return INSTANCE;
-  }
-
-  public synchronized Collection<HadoopServer> getServers() {
-    return Collections.unmodifiableCollection(servers.values());
-  }
-
-  /**
-   * Load all available locations from the workspace configuration directory.
-   */
-  private synchronized void load() {
-    Map<String, HadoopServer> map = new TreeMap<String, HadoopServer>();
-    for (File file : saveDir.listFiles()) {
-      try {
-        HadoopServer server = new HadoopServer(file);
-        map.put(server.getLocationName(), server);
-
-      } catch (Exception exn) {
-        System.err.println(exn);
-      }
+        load();
     }
-    this.servers = map;
-  }
 
-  private synchronized void store() {
-    try {
-      File dir = File.createTempFile("locations", "new", baseDir);
-      dir.delete();
-      dir.mkdirs();
+    private Map<String, HadoopServer> servers;
 
-      for (HadoopServer server : servers.values()) {
-        server.storeSettingsToFile(new File(dir, server.getLocationName()
-            + ".xml"));
-      }
+    private Set<IHadoopServerListener> listeners =
+            new HashSet<IHadoopServerListener>();
 
-      FilenameFilter XMLFilter = new FilenameFilter() {
-        public boolean accept(File dir, String name) {
-          String lower = name.toLowerCase();
-          return lower.endsWith(".xml");
+    public static ServerRegistry getInstance() {
+        return INSTANCE;
+    }
+
+    public synchronized Collection<HadoopServer> getServers() {
+        return Collections.unmodifiableCollection(servers.values());
+    }
+
+    /**
+     * Load all available locations from the workspace configuration directory.
+     */
+    private synchronized void load() {
+        Map<String, HadoopServer> map = new TreeMap<String, HadoopServer>();
+        for (File file : saveDir.listFiles()) {
+            try {
+                HadoopServer server = new HadoopServer(file);
+                map.put(server.getLocationName(), server);
+
+            } catch (Exception exn) {
+                System.err.println(exn);
+            }
         }
-      };
-
-      File backup = new File(baseDir, "locations.backup");
-      if (backup.exists()) {
-        for (File file : backup.listFiles(XMLFilter))
-          if (!file.delete())
-            throw new IOException("Unable to delete backup location file: "
-                + file);
-        if (!backup.delete())
-          throw new IOException(
-              "Unable to delete backup location directory: " + backup);
-      }
-
-      saveDir.renameTo(backup);
-      dir.renameTo(saveDir);
-
-    } catch (IOException ioe) {
-      ioe.printStackTrace();
-      MessageDialog.openError(null,
-          "Saving configuration of Hadoop locations failed", ioe.toString());
+        this.servers = map;
     }
-  }
 
-  public void dispose() {
-    for (HadoopServer server : getServers()) {
-      server.dispose();
+    private synchronized void store() {
+        try {
+            File dir = File.createTempFile("locations", "new", baseDir);
+            dir.delete();
+            dir.mkdirs();
+
+            for (HadoopServer server : servers.values()) {
+                server.storeSettingsToFile(new File(dir, server.getLocationName()
+                        + ".xml"));
+            }
+
+            FilenameFilter XMLFilter = new FilenameFilter() {
+                public boolean accept(File dir, String name) {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".xml");
+                }
+            };
+
+            File backup = new File(baseDir, "locations.backup");
+            if (backup.exists()) {
+                for (File file : backup.listFiles(XMLFilter))
+                    if (!file.delete())
+                        throw new IOException("Unable to delete backup location file: "
+                                + file);
+                if (!backup.delete())
+                    throw new IOException(
+                            "Unable to delete backup location directory: " + backup);
+            }
+
+            saveDir.renameTo(backup);
+            dir.renameTo(saveDir);
+
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+            MessageDialog.openError(null,
+                    "Saving configuration of Hadoop locations failed", ioe.toString());
+        }
     }
-  }
 
-  public synchronized HadoopServer getServer(String location) {
-    return servers.get(location);
-  }
+    public void dispose() {
+        for (HadoopServer server : getServers()) {
+            server.dispose();
+        }
+    }
+
+    public synchronized HadoopServer getServer(String location) {
+        return servers.get(location);
+    }
 
   /*
    * HadoopServer map listeners
    */
 
-  public void addListener(IHadoopServerListener l) {
-    synchronized (listeners) {
-      listeners.add(l);
+    public void addListener(IHadoopServerListener l) {
+        synchronized (listeners) {
+            listeners.add(l);
+        }
     }
-  }
 
-  public void removeListener(IHadoopServerListener l) {
-    synchronized (listeners) {
-      listeners.remove(l);
+    public void removeListener(IHadoopServerListener l) {
+        synchronized (listeners) {
+            listeners.remove(l);
+        }
     }
-  }
 
-  private void fireListeners(HadoopServer location, int kind) {
-    synchronized (listeners) {
-      for (IHadoopServerListener listener : listeners) {
-        listener.serverChanged(location, kind);
-      }
+    private void fireListeners(HadoopServer location, int kind) {
+        synchronized (listeners) {
+            for (IHadoopServerListener listener : listeners) {
+                listener.serverChanged(location, kind);
+            }
+        }
     }
-  }
 
-  public synchronized void removeServer(HadoopServer server) {
-    this.servers.remove(server.getLocationName());
-    store();
-    fireListeners(server, SERVER_REMOVED);
-  }
-
-  public synchronized void addServer(HadoopServer server) {
-    this.servers.put(server.getLocationName(), server);
-    store();
-    fireListeners(server, SERVER_ADDED);
-  }
-
-  /**
-   * Update one Hadoop location
-   * 
-   * @param originalName the original location name (might have changed)
-   * @param server the location
-   */
-  public synchronized void updateServer(String originalName,
-      HadoopServer server) {
-
-    // Update the map if the location name has changed
-    if (!server.getLocationName().equals(originalName)) {
-      servers.remove(originalName);
-      servers.put(server.getLocationName(), server);
+    public synchronized void removeServer(HadoopServer server) {
+        this.servers.remove(server.getLocationName());
+        store();
+        fireListeners(server, SERVER_REMOVED);
     }
-    store();
-    fireListeners(server, SERVER_STATE_CHANGED);
-  }
+
+    public synchronized void addServer(HadoopServer server) {
+        this.servers.put(server.getLocationName(), server);
+        store();
+        fireListeners(server, SERVER_ADDED);
+    }
+
+    /**
+     * Update one Hadoop location
+     *
+     * @param originalName the original location name (might have changed)
+     * @param server the location
+     */
+    public synchronized void updateServer(String originalName,
+                                          HadoopServer server) {
+
+        // Update the map if the location name has changed
+        if (!server.getLocationName().equals(originalName)) {
+            servers.remove(originalName);
+            servers.put(server.getLocationName(), server);
+        }
+        store();
+        fireListeners(server, SERVER_STATE_CHANGED);
+    }
 }

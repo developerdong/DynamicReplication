@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -37,83 +37,83 @@ import junit.framework.TestCase;
  * a warning in such a case.
  */
 public class TestMissingBlocksAlert extends TestCase {
-  
-  private static final Log LOG = 
-                           LogFactory.getLog(TestMissingBlocksAlert.class);
-  
-  public void testMissingBlocksAlert() throws IOException, 
-                                       InterruptedException {
-    
-    MiniDFSCluster cluster = null;
-    
-    try {
-      Configuration conf = new Configuration();
-      //minimize test delay
-      conf.setInt("dfs.replication.interval", 0);
-      int fileLen = 10*1024;
 
-      //start a cluster with single datanode
-      cluster = new MiniDFSCluster(conf, 1, true, null);
-      cluster.waitActive();
+    private static final Log LOG =
+            LogFactory.getLog(TestMissingBlocksAlert.class);
 
-      DistributedFileSystem dfs = 
-                            (DistributedFileSystem) cluster.getFileSystem();
+    public void testMissingBlocksAlert() throws IOException,
+            InterruptedException {
 
-      // create a normal file
-      DFSTestUtil.createFile(dfs, new Path("/testMissingBlocksAlert/file1"), 
-                             fileLen, (short)3, 0);
+        MiniDFSCluster cluster = null;
 
-      Path corruptFile = new Path("/testMissingBlocks/corruptFile");
-      DFSTestUtil.createFile(dfs, corruptFile, fileLen, (short)3, 0);
+        try {
+            Configuration conf = new Configuration();
+            //minimize test delay
+            conf.setInt("dfs.replication.interval", 0);
+            int fileLen = 10 * 1024;
 
+            //start a cluster with single datanode
+            cluster = new MiniDFSCluster(conf, 1, true, null);
+            cluster.waitActive();
 
-      // Corrupt the block
-      String block = DFSTestUtil.getFirstBlock(dfs, corruptFile).getBlockName();
-      TestDatanodeBlockScanner.corruptReplica(block, 0);
+            DistributedFileSystem dfs =
+                    (DistributedFileSystem) cluster.getFileSystem();
 
-      // read the file so that the corrupt block is reported to NN
-      FSDataInputStream in = dfs.open(corruptFile); 
-      try {
-        in.readFully(new byte[fileLen]);
-      } catch (ChecksumException ignored) { // checksum error is expected.      
-      }
-      in.close();
+            // create a normal file
+            DFSTestUtil.createFile(dfs, new Path("/testMissingBlocksAlert/file1"),
+                    fileLen, (short) 3, 0);
 
-      LOG.info("Waiting for missing blocks count to increase...");
-
-      while (dfs.getMissingBlocksCount() <= 0) {
-        Thread.sleep(100);
-      }
-      assertTrue(dfs.getMissingBlocksCount() == 1);
+            Path corruptFile = new Path("/testMissingBlocks/corruptFile");
+            DFSTestUtil.createFile(dfs, corruptFile, fileLen, (short) 3, 0);
 
 
-      // Now verify that it shows up on webui
-      URL url = new URL("http://" + conf.get("dfs.http.address") + 
-                        "/dfshealth.jsp");
-      String dfsFrontPage = DFSTestUtil.urlGet(url);
-      String warnStr = "WARNING : There are about ";
-      assertTrue("HDFS Front page does not contain expected warning", 
-                 dfsFrontPage.contains(warnStr + "1 missing blocks"));
+            // Corrupt the block
+            String block = DFSTestUtil.getFirstBlock(dfs, corruptFile).getBlockName();
+            TestDatanodeBlockScanner.corruptReplica(block, 0);
 
-      // now do the reverse : remove the file expect the number of missing 
-      // blocks to go to zero
+            // read the file so that the corrupt block is reported to NN
+            FSDataInputStream in = dfs.open(corruptFile);
+            try {
+                in.readFully(new byte[fileLen]);
+            } catch (ChecksumException ignored) { // checksum error is expected.
+            }
+            in.close();
 
-      dfs.delete(corruptFile, true);
+            LOG.info("Waiting for missing blocks count to increase...");
 
-      LOG.info("Waiting for missing blocks count to be zero...");
-      while (dfs.getMissingBlocksCount() > 0) {
-        Thread.sleep(100);
-      }
+            while (dfs.getMissingBlocksCount() <= 0) {
+                Thread.sleep(100);
+            }
+            assertTrue(dfs.getMissingBlocksCount() == 1);
 
-      // and make sure WARNING disappears
-      // Now verify that it shows up on webui
-      dfsFrontPage = DFSTestUtil.urlGet(url);
-      assertFalse("HDFS Front page contains unexpected warning", 
-                  dfsFrontPage.contains(warnStr));
-    } finally {
-      if (cluster != null) {
-        cluster.shutdown();
-      }
+
+            // Now verify that it shows up on webui
+            URL url = new URL("http://" + conf.get("dfs.http.address") +
+                    "/dfshealth.jsp");
+            String dfsFrontPage = DFSTestUtil.urlGet(url);
+            String warnStr = "WARNING : There are about ";
+            assertTrue("HDFS Front page does not contain expected warning",
+                    dfsFrontPage.contains(warnStr + "1 missing blocks"));
+
+            // now do the reverse : remove the file expect the number of missing
+            // blocks to go to zero
+
+            dfs.delete(corruptFile, true);
+
+            LOG.info("Waiting for missing blocks count to be zero...");
+            while (dfs.getMissingBlocksCount() > 0) {
+                Thread.sleep(100);
+            }
+
+            // and make sure WARNING disappears
+            // Now verify that it shows up on webui
+            dfsFrontPage = DFSTestUtil.urlGet(url);
+            assertFalse("HDFS Front page contains unexpected warning",
+                    dfsFrontPage.contains(warnStr));
+        } finally {
+            if (cluster != null) {
+                cluster.shutdown();
+            }
+        }
     }
-  }
 }

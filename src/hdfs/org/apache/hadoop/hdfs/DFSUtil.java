@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,33 +19,34 @@
 package org.apache.hadoop.hdfs;
 
 import java.util.StringTokenizer;
+
 import org.apache.hadoop.fs.Path;
 
 public class DFSUtil {
-  /**
-   * Whether the pathname is valid.  Currently prohibits relative paths, 
-   * and names which contain a ":" or "/" 
-   */
-  public static boolean isValidName(String src) {
-      
-    // Path must be absolute.
-    if (!src.startsWith(Path.SEPARATOR)) {
-      return false;
+    /**
+     * Whether the pathname is valid.  Currently prohibits relative paths,
+     * and names which contain a ":" or "/"
+     */
+    public static boolean isValidName(String src) {
+
+        // Path must be absolute.
+        if (!src.startsWith(Path.SEPARATOR)) {
+            return false;
+        }
+
+        // Check for ".." "." ":" "/"
+        StringTokenizer tokens = new StringTokenizer(src, Path.SEPARATOR);
+        while (tokens.hasMoreTokens()) {
+            String element = tokens.nextToken();
+            if (element.equals("..") ||
+                    element.equals(".") ||
+                    (element.indexOf(":") >= 0) ||
+                    (element.indexOf("/") >= 0)) {
+                return false;
+            }
+        }
+        return true;
     }
-      
-    // Check for ".." "." ":" "/"
-    StringTokenizer tokens = new StringTokenizer(src, Path.SEPARATOR);
-    while(tokens.hasMoreTokens()) {
-      String element = tokens.nextToken();
-      if (element.equals("..") || 
-          element.equals(".")  ||
-          (element.indexOf(":") >= 0)  ||
-          (element.indexOf("/") >= 0)) {
-        return false;
-      }
-    }
-    return true;
-  }
 
 }
 

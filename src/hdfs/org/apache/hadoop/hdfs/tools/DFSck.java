@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -54,109 +54,122 @@ import org.apache.hadoop.util.ToolRunner;
  *  optionally can print detailed statistics on block locations and replication
  *  factors of each file.
  *  The tool also provides and option to filter open files during the scan.
- *  
+ *
  */
 public class DFSck extends Configured implements Tool {
 
-  DFSck() {}
-  
-  /**
-   * Filesystem checker.
-   * @param conf current Configuration
-   * @throws Exception
-   */
-  public DFSck(Configuration conf) throws Exception {
-    super(conf);
-  }
-  
-  private String getInfoServer() throws IOException {
-    return NetUtils.getServerAddress(getConf(), "dfs.info.bindAddress", 
-                                     "dfs.info.port", "dfs.http.address");
-  }
-  
-  /**
-   * Print fsck usage information
-   */
-  static void printUsage() {
-    System.err.println("Usage: DFSck <path> [-move | -delete | -openforwrite] [-files [-blocks [-locations | -racks]]]");
-    System.err.println("\t<path>\tstart checking from this path");
-    System.err.println("\t-move\tmove corrupted files to /lost+found");
-    System.err.println("\t-delete\tdelete corrupted files");
-    System.err.println("\t-files\tprint out files being checked");
-    System.err.println("\t-openforwrite\tprint out files opened for write");
-    System.err.println("\t-blocks\tprint out block report");
-    System.err.println("\t-locations\tprint out locations for every block");
-    System.err.println("\t-racks\tprint out network topology for data-node locations");
-    System.err.println("\t\tBy default fsck ignores files opened for write, " +
-                       "use -openforwrite to report such files. They are usually " +
-                       " tagged CORRUPT or HEALTHY depending on their block " +
-                        "allocation status");
-    ToolRunner.printGenericCommandUsage(System.err);
-  }
-  /**
-   * @param args
-   */
-  public int run(String[] args) throws Exception {
-    String fsName = getInfoServer();
-    if (args.length == 0) {
-      printUsage();
-      return -1;
+    DFSck() {
     }
-    StringBuffer url = new StringBuffer("http://"+fsName+"/fsck?path=");
-    String dir = "/";
-    // find top-level dir first
-    for (int idx = 0; idx < args.length; idx++) {
-      if (!args[idx].startsWith("-")) { dir = args[idx]; break; }
-    }
-    url.append(URLEncoder.encode(dir, "UTF-8"));
-    for (int idx = 0; idx < args.length; idx++) {
-      if (args[idx].equals("-move")) { url.append("&move=1"); }
-      else if (args[idx].equals("-delete")) { url.append("&delete=1"); }
-      else if (args[idx].equals("-files")) { url.append("&files=1"); }
-      else if (args[idx].equals("-openforwrite")) { url.append("&openforwrite=1"); }
-      else if (args[idx].equals("-blocks")) { url.append("&blocks=1"); }
-      else if (args[idx].equals("-locations")) { url.append("&locations=1"); }
-      else if (args[idx].equals("-racks")) { url.append("&racks=1"); }
-    }
-    URL path = new URL(url.toString());
-    URLConnection connection = path.openConnection();
-    InputStream stream = connection.getInputStream();
-    BufferedReader input = new BufferedReader(new InputStreamReader(
-                                              stream, "UTF-8"));
-    String line = null;
-    String lastLine = null;
-    int errCode = -1;
-    try {
-      while ((line = input.readLine()) != null) {
-        System.out.println(line);
-        lastLine = line;
-      }
-    } finally {
-      input.close();
-    }
-    if (lastLine.endsWith(NamenodeFsck.HEALTHY_STATUS)) {
-      errCode = 0;
-    } else if (lastLine.endsWith(NamenodeFsck.CORRUPT_STATUS)) {
-      errCode = 1;
-    } else if (lastLine.endsWith(NamenodeFsck.NONEXISTENT_STATUS)) {
-      errCode = 0;
-    }
-    return errCode;
-  }
 
-  static{
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
-  }
-  
-  public static void main(String[] args) throws Exception {
-    // -files option is also used by GenericOptionsParser
-    // Make sure that is not the first argument for fsck
-    int res = -1;
-    if ((args.length == 0 ) || ("-files".equals(args[0]))) 
-      printUsage();
-    else
-      res = ToolRunner.run(new DFSck(new Configuration()), args);
-    System.exit(res);
-  }
+    /**
+     * Filesystem checker.
+     * @param conf current Configuration
+     * @throws Exception
+     */
+    public DFSck(Configuration conf) throws Exception {
+        super(conf);
+    }
+
+    private String getInfoServer() throws IOException {
+        return NetUtils.getServerAddress(getConf(), "dfs.info.bindAddress",
+                "dfs.info.port", "dfs.http.address");
+    }
+
+    /**
+     * Print fsck usage information
+     */
+    static void printUsage() {
+        System.err.println("Usage: DFSck <path> [-move | -delete | -openforwrite] [-files [-blocks [-locations | -racks]]]");
+        System.err.println("\t<path>\tstart checking from this path");
+        System.err.println("\t-move\tmove corrupted files to /lost+found");
+        System.err.println("\t-delete\tdelete corrupted files");
+        System.err.println("\t-files\tprint out files being checked");
+        System.err.println("\t-openforwrite\tprint out files opened for write");
+        System.err.println("\t-blocks\tprint out block report");
+        System.err.println("\t-locations\tprint out locations for every block");
+        System.err.println("\t-racks\tprint out network topology for data-node locations");
+        System.err.println("\t\tBy default fsck ignores files opened for write, " +
+                "use -openforwrite to report such files. They are usually " +
+                " tagged CORRUPT or HEALTHY depending on their block " +
+                "allocation status");
+        ToolRunner.printGenericCommandUsage(System.err);
+    }
+
+    /**
+     * @param args
+     */
+    public int run(String[] args) throws Exception {
+        String fsName = getInfoServer();
+        if (args.length == 0) {
+            printUsage();
+            return -1;
+        }
+        StringBuffer url = new StringBuffer("http://" + fsName + "/fsck?path=");
+        String dir = "/";
+        // find top-level dir first
+        for (int idx = 0; idx < args.length; idx++) {
+            if (!args[idx].startsWith("-")) {
+                dir = args[idx];
+                break;
+            }
+        }
+        url.append(URLEncoder.encode(dir, "UTF-8"));
+        for (int idx = 0; idx < args.length; idx++) {
+            if (args[idx].equals("-move")) {
+                url.append("&move=1");
+            } else if (args[idx].equals("-delete")) {
+                url.append("&delete=1");
+            } else if (args[idx].equals("-files")) {
+                url.append("&files=1");
+            } else if (args[idx].equals("-openforwrite")) {
+                url.append("&openforwrite=1");
+            } else if (args[idx].equals("-blocks")) {
+                url.append("&blocks=1");
+            } else if (args[idx].equals("-locations")) {
+                url.append("&locations=1");
+            } else if (args[idx].equals("-racks")) {
+                url.append("&racks=1");
+            }
+        }
+        URL path = new URL(url.toString());
+        URLConnection connection = path.openConnection();
+        InputStream stream = connection.getInputStream();
+        BufferedReader input = new BufferedReader(new InputStreamReader(
+                stream, "UTF-8"));
+        String line = null;
+        String lastLine = null;
+        int errCode = -1;
+        try {
+            while ((line = input.readLine()) != null) {
+                System.out.println(line);
+                lastLine = line;
+            }
+        } finally {
+            input.close();
+        }
+        if (lastLine.endsWith(NamenodeFsck.HEALTHY_STATUS)) {
+            errCode = 0;
+        } else if (lastLine.endsWith(NamenodeFsck.CORRUPT_STATUS)) {
+            errCode = 1;
+        } else if (lastLine.endsWith(NamenodeFsck.NONEXISTENT_STATUS)) {
+            errCode = 0;
+        }
+        return errCode;
+    }
+
+    static {
+        Configuration.addDefaultResource("hdfs-default.xml");
+        Configuration.addDefaultResource("hdfs-site.xml");
+    }
+
+    public static void main(String[] args) throws Exception {
+        // -files option is also used by GenericOptionsParser
+        // Make sure that is not the first argument for fsck
+        int res = -1;
+        if ((args.length == 0) || ("-files".equals(args[0])))
+            printUsage();
+        else
+            res = ToolRunner.run(new DFSck(new Configuration()), args);
+        System.exit(res);
+    }
 }

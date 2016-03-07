@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,31 +28,31 @@ import org.apache.hadoop.contrib.index.mapred.Shard;
  */
 public class RoundRobinDistributionPolicy implements IDistributionPolicy {
 
-  private int numShards;
-  private int rr; // round-robin implementation
+    private int numShards;
+    private int rr; // round-robin implementation
 
-  /* (non-Javadoc)
-   * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#init(org.apache.hadoop.contrib.index.mapred.Shard[])
-   */
-  public void init(Shard[] shards) {
-    numShards = shards.length;
-    rr = 0;
-  }
+    /* (non-Javadoc)
+     * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#init(org.apache.hadoop.contrib.index.mapred.Shard[])
+     */
+    public void init(Shard[] shards) {
+        numShards = shards.length;
+        rr = 0;
+    }
 
-  /* (non-Javadoc)
-   * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#chooseShardForInsert(org.apache.hadoop.contrib.index.mapred.DocumentID)
-   */
-  public int chooseShardForInsert(DocumentID key) {
-    int chosen = rr;
-    rr = (rr + 1) % numShards;
-    return chosen;
-  }
+    /* (non-Javadoc)
+     * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#chooseShardForInsert(org.apache.hadoop.contrib.index.mapred.DocumentID)
+     */
+    public int chooseShardForInsert(DocumentID key) {
+        int chosen = rr;
+        rr = (rr + 1) % numShards;
+        return chosen;
+    }
 
-  /* (non-Javadoc)
-   * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#chooseShardForDelete(org.apache.hadoop.contrib.index.mapred.DocumentID)
-   */
-  public int chooseShardForDelete(DocumentID key) {
-    // -1 represents all the shards
-    return -1;
-  }
+    /* (non-Javadoc)
+     * @see org.apache.hadoop.contrib.index.mapred.IDistributionPolicy#chooseShardForDelete(org.apache.hadoop.contrib.index.mapred.DocumentID)
+     */
+    public int chooseShardForDelete(DocumentID key) {
+        // -1 represents all the shards
+        return -1;
+    }
 }

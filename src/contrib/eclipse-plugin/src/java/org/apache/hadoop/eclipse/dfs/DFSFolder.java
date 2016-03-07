@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,179 +35,179 @@ import org.eclipse.jface.dialogs.MessageDialog;
 
 /**
  * Local representation of a folder in the DFS.
- * 
+ *
  * The constructor creates an empty representation of the folder and spawn a
  * thread that will fill
  */
 public class DFSFolder extends DFSPath implements DFSContent {
 
-  static Logger log = Logger.getLogger(DFSFolder.class.getName());
+    static Logger log = Logger.getLogger(DFSFolder.class.getName());
 
-  private DFSContent[] children;
+    private DFSContent[] children;
 
-  protected DFSFolder(DFSContentProvider provider, HadoopServer location)
-      throws IOException {
+    protected DFSFolder(DFSContentProvider provider, HadoopServer location)
+            throws IOException {
 
-    super(provider, location);
-  }
-
-  private DFSFolder(DFSPath parent, Path path) {
-    super(parent, path);
-  }
-
-  protected void loadDFSFolderChildren() throws IOException {
-    List<DFSPath> list = new ArrayList<DFSPath>();
-
-    for (FileStatus status : getDFS().listStatus(this.getPath())) {
-      if (status.isDir()) {
-        list.add(new DFSFolder(this, status.getPath()));
-      } else {
-        list.add(new DFSFile(this, status.getPath()));
-      }
+        super(provider, location);
     }
 
-    this.children = list.toArray(new DFSContent[list.size()]);
-  }
-
-  /**
-   * Upload the given file or directory into this DfsFolder
-   * 
-   * @param file
-   * @throws IOException
-   */
-  public void upload(IProgressMonitor monitor, final File file)
-      throws IOException {
-
-    if (file.isDirectory()) {
-      Path filePath = new Path(this.path, file.getName());
-      getDFS().mkdirs(filePath);
-      DFSFolder newFolder = new DFSFolder(this, filePath);
-      monitor.worked(1);
-      for (File child : file.listFiles()) {
-        if (monitor.isCanceled())
-          return;
-        newFolder.upload(monitor, child);
-      }
-
-    } else if (file.isFile()) {
-      Path filePath = new Path(this.path, file.getName());
-      DFSFile newFile = new DFSFile(this, filePath, file, monitor);
-
-    } else {
-      // XXX don't know what the file is?
-    }
-  }
-
-  /* @inheritDoc */
-  @Override
-  public void downloadToLocalDirectory(IProgressMonitor monitor, File dir) {
-    if (!dir.exists())
-      dir.mkdirs();
-
-    if (!dir.isDirectory()) {
-      MessageDialog.openError(null, "Download to local file system",
-          "Invalid directory location: \"" + dir + "\"");
-      return;
+    private DFSFolder(DFSPath parent, Path path) {
+        super(parent, path);
     }
 
-    File dfsPath = new File(this.getPath().toString());
-    File destination = new File(dir, dfsPath.getName());
+    protected void loadDFSFolderChildren() throws IOException {
+        List<DFSPath> list = new ArrayList<DFSPath>();
 
-    if (!destination.exists()) {
-      if (!destination.mkdir()) {
-        MessageDialog.openError(null, "Download to local directory",
-            "Unable to create directory " + destination.getAbsolutePath());
-        return;
-      }
+        for (FileStatus status : getDFS().listStatus(this.getPath())) {
+            if (status.isDir()) {
+                list.add(new DFSFolder(this, status.getPath()));
+            } else {
+                list.add(new DFSFile(this, status.getPath()));
+            }
+        }
+
+        this.children = list.toArray(new DFSContent[list.size()]);
     }
 
-    // Download all DfsPath children
-    for (Object childObj : getChildren()) {
-      if (childObj instanceof DFSPath) {
-        ((DFSPath) childObj).downloadToLocalDirectory(monitor, destination);
-        monitor.worked(1);
-      }
-    }
-  }
+    /**
+     * Upload the given file or directory into this DfsFolder
+     *
+     * @param file
+     * @throws IOException
+     */
+    public void upload(IProgressMonitor monitor, final File file)
+            throws IOException {
 
-  /* @inheritDoc */
-  @Override
-  public int computeDownloadWork() {
-    int work = 1;
-    for (DFSContent child : getChildren()) {
-      if (child instanceof DFSPath)
-        work += ((DFSPath) child).computeDownloadWork();
+        if (file.isDirectory()) {
+            Path filePath = new Path(this.path, file.getName());
+            getDFS().mkdirs(filePath);
+            DFSFolder newFolder = new DFSFolder(this, filePath);
+            monitor.worked(1);
+            for (File child : file.listFiles()) {
+                if (monitor.isCanceled())
+                    return;
+                newFolder.upload(monitor, child);
+            }
+
+        } else if (file.isFile()) {
+            Path filePath = new Path(this.path, file.getName());
+            DFSFile newFile = new DFSFile(this, filePath, file, monitor);
+
+        } else {
+            // XXX don't know what the file is?
+        }
     }
 
-    return work;
-  }
+    /* @inheritDoc */
+    @Override
+    public void downloadToLocalDirectory(IProgressMonitor monitor, File dir) {
+        if (!dir.exists())
+            dir.mkdirs();
 
-  /**
-   * Create a new sub directory into this directory
-   * 
-   * @param folderName
-   */
-  public void mkdir(String folderName) {
-    try {
-      getDFS().mkdirs(new Path(this.path, folderName));
-    } catch (IOException ioe) {
-      ioe.printStackTrace();
+        if (!dir.isDirectory()) {
+            MessageDialog.openError(null, "Download to local file system",
+                    "Invalid directory location: \"" + dir + "\"");
+            return;
+        }
+
+        File dfsPath = new File(this.getPath().toString());
+        File destination = new File(dir, dfsPath.getName());
+
+        if (!destination.exists()) {
+            if (!destination.mkdir()) {
+                MessageDialog.openError(null, "Download to local directory",
+                        "Unable to create directory " + destination.getAbsolutePath());
+                return;
+            }
+        }
+
+        // Download all DfsPath children
+        for (Object childObj : getChildren()) {
+            if (childObj instanceof DFSPath) {
+                ((DFSPath) childObj).downloadToLocalDirectory(monitor, destination);
+                monitor.worked(1);
+            }
+        }
     }
-    doRefresh();
-  }
+
+    /* @inheritDoc */
+    @Override
+    public int computeDownloadWork() {
+        int work = 1;
+        for (DFSContent child : getChildren()) {
+            if (child instanceof DFSPath)
+                work += ((DFSPath) child).computeDownloadWork();
+        }
+
+        return work;
+    }
+
+    /**
+     * Create a new sub directory into this directory
+     *
+     * @param folderName
+     */
+    public void mkdir(String folderName) {
+        try {
+            getDFS().mkdirs(new Path(this.path, folderName));
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        doRefresh();
+    }
 
   /*
    * Implementation of DFSContent
    */
 
-  /* @inheritDoc */
-  public boolean hasChildren() {
-    if (this.children == null)
-      return true;
-    else
-      return (this.children.length > 0);
-  }
-
-  /* @inheritDoc */
-  public DFSContent[] getChildren() {
-    if (children == null) {
-      new Job("Connecting to DFS " + location) {
-        @Override
-        protected IStatus run(IProgressMonitor monitor) {
-          try {
-            loadDFSFolderChildren();
-            return Status.OK_STATUS;
-
-          } catch (IOException ioe) {
-            children =
-                new DFSContent[] { new DFSMessage("Error: "
-                    + ioe.getLocalizedMessage()) };
-            return Status.CANCEL_STATUS;
-
-          } finally {
-            // Under all circumstances, update the UI
-            provider.refresh(DFSFolder.this);
-          }
-        }
-      }.schedule();
-
-      return new DFSContent[] { new DFSMessage("Listing folder content...") };
+    /* @inheritDoc */
+    public boolean hasChildren() {
+        if (this.children == null)
+            return true;
+        else
+            return (this.children.length > 0);
     }
-    return this.children;
-  }
 
-  /* @inheritDoc */
-  @Override
-  public void refresh() {
-    this.children = null;
-    this.doRefresh();
-  }
+    /* @inheritDoc */
+    public DFSContent[] getChildren() {
+        if (children == null) {
+            new Job("Connecting to DFS " + location) {
+                @Override
+                protected IStatus run(IProgressMonitor monitor) {
+                    try {
+                        loadDFSFolderChildren();
+                        return Status.OK_STATUS;
 
-  /* @inheritDoc */
-  @Override
-  public String toString() {
-    return String.format("%s (%s)", super.toString(),
-        this.getChildren().length);
-  }
+                    } catch (IOException ioe) {
+                        children =
+                                new DFSContent[]{new DFSMessage("Error: "
+                                        + ioe.getLocalizedMessage())};
+                        return Status.CANCEL_STATUS;
+
+                    } finally {
+                        // Under all circumstances, update the UI
+                        provider.refresh(DFSFolder.this);
+                    }
+                }
+            }.schedule();
+
+            return new DFSContent[]{new DFSMessage("Listing folder content...")};
+        }
+        return this.children;
+    }
+
+    /* @inheritDoc */
+    @Override
+    public void refresh() {
+        this.children = null;
+        this.doRefresh();
+    }
+
+    /* @inheritDoc */
+    @Override
+    public String toString() {
+        return String.format("%s (%s)", super.toString(),
+                this.getChildren().length);
+    }
 
 }

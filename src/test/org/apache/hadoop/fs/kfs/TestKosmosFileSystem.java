@@ -1,11 +1,10 @@
 /**
- *
  * Licensed under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
@@ -13,7 +12,7 @@
  * permissions and limitations under the License.
  *
  * @author: Sriram Rao (Kosmix Corp.)
- * 
+ * <p>
  * Unit tests for testing the KosmosFileSystem API implementation.
  */
 
@@ -39,17 +38,17 @@ public class TestKosmosFileSystem extends TestCase {
     KosmosFileSystem kosmosFileSystem;
     KFSEmulationImpl kfsEmul;
     Path baseDir;
-    
+
     @Override
     protected void setUp() throws IOException {
         Configuration conf = new Configuration();
-    
+
         kfsEmul = new KFSEmulationImpl(conf);
         kosmosFileSystem = new KosmosFileSystem(kfsEmul);
         // a dummy URI; we are not connecting to any setup here
         kosmosFileSystem.initialize(URI.create("kfs:///"), conf);
-        baseDir = new Path(System.getProperty("test.build.data", "/tmp" ) +
-                                              "/kfs-test");
+        baseDir = new Path(System.getProperty("test.build.data", "/tmp") +
+                "/kfs-test");
     }
 
     @Override
@@ -169,11 +168,11 @@ public class TestKosmosFileSystem extends TestCase {
         s2.close();
 
         kosmosFileSystem.delete(file1, true);
-        assertFalse(kosmosFileSystem.exists(file1));        
+        assertFalse(kosmosFileSystem.exists(file1));
         kosmosFileSystem.delete(subDir1, true);
-        assertFalse(kosmosFileSystem.exists(subDir1));        
+        assertFalse(kosmosFileSystem.exists(subDir1));
         kosmosFileSystem.delete(baseDir, true);
-        assertFalse(kosmosFileSystem.exists(baseDir));        
+        assertFalse(kosmosFileSystem.exists(baseDir));
     }
-    
+
 }

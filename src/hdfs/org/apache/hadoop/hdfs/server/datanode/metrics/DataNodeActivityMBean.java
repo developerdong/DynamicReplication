@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,19 +17,21 @@
  */
 
 package org.apache.hadoop.hdfs.server.datanode.metrics;
+
 import java.util.Random;
 
 import javax.management.ObjectName;
+
 import org.apache.hadoop.metrics.util.MBeanUtil;
 import org.apache.hadoop.metrics.util.MetricsDynamicMBeanBase;
 import org.apache.hadoop.metrics.util.MetricsRegistry;
 
 /**
- * 
+ *
  * This is the JMX MBean for reporting the DataNode Activity.
  * The MBean is register using the name
  *        "hadoop:service=DataNode,name=DataNodeActivity-<storageid>"
- * 
+ *
  * Many of the activity metrics are sampled and averaged on an interval 
  * which can be specified in the metrics config file.
  * <p>
@@ -39,7 +41,7 @@ import org.apache.hadoop.metrics.util.MetricsRegistry;
  * using any other metrics context then you can turn on the viewing and averaging
  * of sampled metrics by  specifying the following two lines
  *  in the hadoop-meterics.properties file:
-*  <pre>
+ *  <pre>
  *        dfs.class=org.apache.hadoop.metrics.spi.NullContextWithUpdateThread
  *        dfs.period=10
  *  </pre>
@@ -54,23 +56,23 @@ import org.apache.hadoop.metrics.util.MetricsRegistry;
  */
 
 public class DataNodeActivityMBean extends MetricsDynamicMBeanBase {
-  final private ObjectName mbeanName;
-  private Random rand = new Random(); 
+    final private ObjectName mbeanName;
+    private Random rand = new Random();
 
-  public DataNodeActivityMBean(final MetricsRegistry mr, final String storageId) {
-    super(mr, "Activity statistics at the DataNode");
-    String storageName;
-    if (storageId.equals("")) {// Temp fix for the uninitialized storage
-      storageName = "UndefinedStorageId" + rand.nextInt();
-    } else {
-      storageName = storageId;
+    public DataNodeActivityMBean(final MetricsRegistry mr, final String storageId) {
+        super(mr, "Activity statistics at the DataNode");
+        String storageName;
+        if (storageId.equals("")) {// Temp fix for the uninitialized storage
+            storageName = "UndefinedStorageId" + rand.nextInt();
+        } else {
+            storageName = storageId;
+        }
+        mbeanName = MBeanUtil.registerMBean("DataNode", "DataNodeActivity-" + storageName, this);
     }
-    mbeanName = MBeanUtil.registerMBean("DataNode", "DataNodeActivity-" + storageName, this);
-  }
-  
 
-  public void shutdown() {
-    if (mbeanName != null)
-      MBeanUtil.unregisterMBean(mbeanName);
-  }
+
+    public void shutdown() {
+        if (mbeanName != null)
+            MBeanUtil.unregisterMBean(mbeanName);
+    }
 }

@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,7 +26,7 @@ import java.io.OutputStream;
  * Provides a facility for serializing objects of type <T> to an
  * {@link OutputStream}.
  * </p>
- * 
+ *
  * <p>
  * Serializers are stateful, but must not buffer the output since
  * other producers may write to the output between calls to
@@ -35,18 +35,18 @@ import java.io.OutputStream;
  * @param <T>
  */
 public interface Serializer<T> {
-  /**
-   * <p>Prepare the serializer for writing.</p>
-   */
-  void open(OutputStream out) throws IOException;
-  
-  /**
-   * <p>Serialize <code>t</code> to the underlying output stream.</p>
-   */
-  void serialize(T t) throws IOException;
-  
-  /**
-   * <p>Close the underlying output stream and clear up any resources.</p>
-   */  
-  void close() throws IOException;
+    /**
+     * <p>Prepare the serializer for writing.</p>
+     */
+    void open(OutputStream out) throws IOException;
+
+    /**
+     * <p>Serialize <code>t</code> to the underlying output stream.</p>
+     */
+    void serialize(T t) throws IOException;
+
+    /**
+     * <p>Close the underlying output stream and clear up any resources.</p>
+     */
+    void close() throws IOException;
 }

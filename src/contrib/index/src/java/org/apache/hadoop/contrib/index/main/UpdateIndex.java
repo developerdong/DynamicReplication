@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -40,7 +40,7 @@ import org.apache.hadoop.util.ReflectionUtils;
  * A distributed "index" is partitioned into "shards". Each shard corresponds
  * to a Lucene instance. This class contains the main() method which uses a
  * Map/Reduce job to analyze documents and update Lucene instances in parallel.
- * 
+ *
  * The main() method in UpdateIndex requires the following information for
  * updating the shards:
  *   - Input formatter. This specifies how to format the input documents.
@@ -64,212 +64,213 @@ import org.apache.hadoop.util.ReflectionUtils;
  * multiple inserts, deletes or updates to the same document is undefined.
  */
 public class UpdateIndex {
-  public static final Log LOG = LogFactory.getLog(UpdateIndex.class);
+    public static final Log LOG = LogFactory.getLog(UpdateIndex.class);
 
-  private static final NumberFormat NUMBER_FORMAT = NumberFormat.getInstance();
-  static {
-    NUMBER_FORMAT.setMinimumIntegerDigits(5);
-    NUMBER_FORMAT.setGroupingUsed(false);
-  }
+    private static final NumberFormat NUMBER_FORMAT = NumberFormat.getInstance();
 
-  private static long now() {
-    return System.currentTimeMillis();
-  }
+    static {
+        NUMBER_FORMAT.setMinimumIntegerDigits(5);
+        NUMBER_FORMAT.setGroupingUsed(false);
+    }
 
-  private static void printUsage(String cmd) {
-    System.err.println("Usage: java " + UpdateIndex.class.getName() + "\n"
-        + "                        -inputPaths <inputPath,inputPath>\n"
-        + "                        -outputPath <outputPath>\n"
-        + "                        -shards     <shardDir,shardDir>\n"
-        + "                        -indexPath  <indexPath>\n"
-        + "                        -numShards  <num>\n"
-        + "                        -numMapTasks <num>\n"
-        + "                        -conf       <confPath>\n"
-        + "Note: Do not use both -shards option and -indexPath option.");
-  }
+    private static long now() {
+        return System.currentTimeMillis();
+    }
 
-  private static String getIndexPath(Configuration conf) {
-    return conf.get("sea.index.path");
-  }
+    private static void printUsage(String cmd) {
+        System.err.println("Usage: java " + UpdateIndex.class.getName() + "\n"
+                + "                        -inputPaths <inputPath,inputPath>\n"
+                + "                        -outputPath <outputPath>\n"
+                + "                        -shards     <shardDir,shardDir>\n"
+                + "                        -indexPath  <indexPath>\n"
+                + "                        -numShards  <num>\n"
+                + "                        -numMapTasks <num>\n"
+                + "                        -conf       <confPath>\n"
+                + "Note: Do not use both -shards option and -indexPath option.");
+    }
 
-  private static int getNumShards(Configuration conf) {
-    return conf.getInt("sea.num.shards", 1);
-  }
+    private static String getIndexPath(Configuration conf) {
+        return conf.get("sea.index.path");
+    }
 
-  private static Shard[] createShards(String indexPath, int numShards,
-      Configuration conf) throws IOException {
+    private static int getNumShards(Configuration conf) {
+        return conf.getInt("sea.num.shards", 1);
+    }
 
-    String parent = Shard.normalizePath(indexPath) + Path.SEPARATOR;
-    long versionNumber = -1;
-    long generation = -1;
+    private static Shard[] createShards(String indexPath, int numShards,
+                                        Configuration conf) throws IOException {
 
-    FileSystem fs = FileSystem.get(conf);
-    Path path = new Path(indexPath);
+        String parent = Shard.normalizePath(indexPath) + Path.SEPARATOR;
+        long versionNumber = -1;
+        long generation = -1;
 
-    if (fs.exists(path)) {
-      FileStatus[] fileStatus = fs.listStatus(path);
-      String[] shardNames = new String[fileStatus.length];
-      int count = 0;
-      for (int i = 0; i < fileStatus.length; i++) {
-        if (fileStatus[i].isDir()) {
-          shardNames[count] = fileStatus[i].getPath().getName();
-          count++;
+        FileSystem fs = FileSystem.get(conf);
+        Path path = new Path(indexPath);
+
+        if (fs.exists(path)) {
+            FileStatus[] fileStatus = fs.listStatus(path);
+            String[] shardNames = new String[fileStatus.length];
+            int count = 0;
+            for (int i = 0; i < fileStatus.length; i++) {
+                if (fileStatus[i].isDir()) {
+                    shardNames[count] = fileStatus[i].getPath().getName();
+                    count++;
+                }
+            }
+            Arrays.sort(shardNames, 0, count);
+
+            Shard[] shards = new Shard[count >= numShards ? count : numShards];
+            for (int i = 0; i < count; i++) {
+                shards[i] =
+                        new Shard(versionNumber, parent + shardNames[i], generation);
+            }
+
+            int number = count;
+            for (int i = count; i < numShards; i++) {
+                String shardPath;
+                while (true) {
+                    shardPath = parent + NUMBER_FORMAT.format(number++);
+                    if (!fs.exists(new Path(shardPath))) {
+                        break;
+                    }
+                }
+                shards[i] = new Shard(versionNumber, shardPath, generation);
+            }
+            return shards;
+        } else {
+            Shard[] shards = new Shard[numShards];
+            for (int i = 0; i < shards.length; i++) {
+                shards[i] =
+                        new Shard(versionNumber, parent + NUMBER_FORMAT.format(i),
+                                generation);
+            }
+            return shards;
         }
-      }
-      Arrays.sort(shardNames, 0, count);
+    }
 
-      Shard[] shards = new Shard[count >= numShards ? count : numShards];
-      for (int i = 0; i < count; i++) {
-        shards[i] =
-            new Shard(versionNumber, parent + shardNames[i], generation);
-      }
-
-      int number = count;
-      for (int i = count; i < numShards; i++) {
-        String shardPath;
-        while (true) {
-          shardPath = parent + NUMBER_FORMAT.format(number++);
-          if (!fs.exists(new Path(shardPath))) {
-            break;
-          }
+    /**
+     * The main() method
+     * @param argv
+     */
+    public static void main(String[] argv) {
+        if (argv.length == 0) {
+            printUsage("");
+            System.exit(-1);
         }
-        shards[i] = new Shard(versionNumber, shardPath, generation);
-      }
-      return shards;
-    } else {
-      Shard[] shards = new Shard[numShards];
-      for (int i = 0; i < shards.length; i++) {
-        shards[i] =
-            new Shard(versionNumber, parent + NUMBER_FORMAT.format(i),
-                generation);
-      }
-      return shards;
+
+        String inputPathsString = null;
+        Path outputPath = null;
+        String shardsString = null;
+        String indexPath = null;
+        int numShards = -1;
+        int numMapTasks = -1;
+        Configuration conf = new Configuration();
+        String confPath = null;
+
+        // parse the command line
+        for (int i = 0; i < argv.length; i++) { // parse command line
+            if (argv[i].equals("-inputPaths")) {
+                inputPathsString = argv[++i];
+            } else if (argv[i].equals("-outputPath")) {
+                outputPath = new Path(argv[++i]);
+            } else if (argv[i].equals("-shards")) {
+                shardsString = argv[++i];
+            } else if (argv[i].equals("-indexPath")) {
+                indexPath = argv[++i];
+            } else if (argv[i].equals("-numShards")) {
+                numShards = Integer.parseInt(argv[++i]);
+            } else if (argv[i].equals("-numMapTasks")) {
+                numMapTasks = Integer.parseInt(argv[++i]);
+            } else if (argv[i].equals("-conf")) {
+                // add as a local FS resource
+                confPath = argv[++i];
+                conf.addResource(new Path(confPath));
+            } else {
+                System.out.println("Unknown option " + argv[i] + " w/ value "
+                        + argv[++i]);
+            }
+        }
+        LOG.info("inputPaths = " + inputPathsString);
+        LOG.info("outputPath = " + outputPath);
+        LOG.info("shards     = " + shardsString);
+        LOG.info("indexPath  = " + indexPath);
+        LOG.info("numShards  = " + numShards);
+        LOG.info("numMapTasks= " + numMapTasks);
+        LOG.info("confPath   = " + confPath);
+
+        Path[] inputPaths = null;
+        Shard[] shards = null;
+
+        JobConf jobConf = new JobConf(conf);
+        IndexUpdateConfiguration iconf = new IndexUpdateConfiguration(jobConf);
+
+        if (inputPathsString != null) {
+            jobConf.set("mapred.input.dir", inputPathsString);
+        }
+        inputPaths = FileInputFormat.getInputPaths(jobConf);
+        if (inputPaths.length == 0) {
+            inputPaths = null;
+        }
+
+        if (outputPath == null) {
+            outputPath = FileOutputFormat.getOutputPath(jobConf);
+        }
+
+        if (inputPaths == null || outputPath == null) {
+            System.err.println("InputPaths and outputPath must be specified.");
+            printUsage("");
+            System.exit(-1);
+        }
+
+        if (shardsString != null) {
+            iconf.setIndexShards(shardsString);
+        }
+        shards = Shard.getIndexShards(iconf);
+        if (shards != null && shards.length == 0) {
+            shards = null;
+        }
+
+        if (indexPath == null) {
+            indexPath = getIndexPath(conf);
+        }
+        if (numShards <= 0) {
+            numShards = getNumShards(conf);
+        }
+
+        if (shards == null && indexPath == null) {
+            System.err.println("Either shards or indexPath must be specified.");
+            printUsage("");
+            System.exit(-1);
+        }
+
+        if (numMapTasks <= 0) {
+            numMapTasks = jobConf.getNumMapTasks();
+        }
+
+        try {
+            // create shards and set their directories if necessary
+            if (shards == null) {
+                shards = createShards(indexPath, numShards, conf);
+            }
+
+            long startTime = now();
+            try {
+                IIndexUpdater updater =
+                        (IIndexUpdater) ReflectionUtils.newInstance(
+                                iconf.getIndexUpdaterClass(), conf);
+                LOG.info("sea.index.updater = "
+                        + iconf.getIndexUpdaterClass().getName());
+
+                updater.run(conf, inputPaths, outputPath, numMapTasks, shards);
+                LOG.info("Index update job is done");
+
+            } finally {
+                long elapsedTime = now() - startTime;
+                LOG.info("Elapsed time is  " + (elapsedTime / 1000) + "s");
+                System.out.println("Elapsed time is " + (elapsedTime / 1000) + "s");
+            }
+        } catch (Exception e) {
+            e.printStackTrace(System.err);
+        }
     }
-  }
-
-  /**
-   * The main() method
-   * @param argv
-   */
-  public static void main(String[] argv) {
-    if (argv.length == 0) {
-      printUsage("");
-      System.exit(-1);
-    }
-
-    String inputPathsString = null;
-    Path outputPath = null;
-    String shardsString = null;
-    String indexPath = null;
-    int numShards = -1;
-    int numMapTasks = -1;
-    Configuration conf = new Configuration();
-    String confPath = null;
-
-    // parse the command line
-    for (int i = 0; i < argv.length; i++) { // parse command line
-      if (argv[i].equals("-inputPaths")) {
-        inputPathsString = argv[++i];
-      } else if (argv[i].equals("-outputPath")) {
-        outputPath = new Path(argv[++i]);
-      } else if (argv[i].equals("-shards")) {
-        shardsString = argv[++i];
-      } else if (argv[i].equals("-indexPath")) {
-        indexPath = argv[++i];
-      } else if (argv[i].equals("-numShards")) {
-        numShards = Integer.parseInt(argv[++i]);
-      } else if (argv[i].equals("-numMapTasks")) {
-        numMapTasks = Integer.parseInt(argv[++i]);
-      } else if (argv[i].equals("-conf")) {
-        // add as a local FS resource
-        confPath = argv[++i];
-        conf.addResource(new Path(confPath));
-      } else {
-        System.out.println("Unknown option " + argv[i] + " w/ value "
-            + argv[++i]);
-      }
-    }
-    LOG.info("inputPaths = " + inputPathsString);
-    LOG.info("outputPath = " + outputPath);
-    LOG.info("shards     = " + shardsString);
-    LOG.info("indexPath  = " + indexPath);
-    LOG.info("numShards  = " + numShards);
-    LOG.info("numMapTasks= " + numMapTasks);
-    LOG.info("confPath   = " + confPath);
-
-    Path[] inputPaths = null;
-    Shard[] shards = null;
-
-    JobConf jobConf = new JobConf(conf);
-    IndexUpdateConfiguration iconf = new IndexUpdateConfiguration(jobConf);
-
-    if (inputPathsString != null) {
-      jobConf.set("mapred.input.dir", inputPathsString);
-    }
-    inputPaths = FileInputFormat.getInputPaths(jobConf);
-    if (inputPaths.length == 0) {
-      inputPaths = null;
-    }
-
-    if (outputPath == null) {
-      outputPath = FileOutputFormat.getOutputPath(jobConf);
-    }
-
-    if (inputPaths == null || outputPath == null) {
-      System.err.println("InputPaths and outputPath must be specified.");
-      printUsage("");
-      System.exit(-1);
-    }
-
-    if (shardsString != null) {
-      iconf.setIndexShards(shardsString);
-    }
-    shards = Shard.getIndexShards(iconf);
-    if (shards != null && shards.length == 0) {
-      shards = null;
-    }
-
-    if (indexPath == null) {
-      indexPath = getIndexPath(conf);
-    }
-    if (numShards <= 0) {
-      numShards = getNumShards(conf);
-    }
-
-    if (shards == null && indexPath == null) {
-      System.err.println("Either shards or indexPath must be specified.");
-      printUsage("");
-      System.exit(-1);
-    }
-
-    if (numMapTasks <= 0) {
-      numMapTasks = jobConf.getNumMapTasks();
-    }
-
-    try {
-      // create shards and set their directories if necessary
-      if (shards == null) {
-        shards = createShards(indexPath, numShards, conf);
-      }
-
-      long startTime = now();
-      try {
-        IIndexUpdater updater =
-            (IIndexUpdater) ReflectionUtils.newInstance(
-                iconf.getIndexUpdaterClass(), conf);
-        LOG.info("sea.index.updater = "
-            + iconf.getIndexUpdaterClass().getName());
-
-        updater.run(conf, inputPaths, outputPath, numMapTasks, shards);
-        LOG.info("Index update job is done");
-
-      } finally {
-        long elapsedTime = now() - startTime;
-        LOG.info("Elapsed time is  " + (elapsedTime / 1000) + "s");
-        System.out.println("Elapsed time is " + (elapsedTime / 1000) + "s");
-      }
-    } catch (Exception e) {
-      e.printStackTrace(System.err);
-    }
-  }
 }

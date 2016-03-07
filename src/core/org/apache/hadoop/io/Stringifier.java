@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,27 +28,27 @@ import java.io.IOException;
  */
 public interface Stringifier<T> extends java.io.Closeable {
 
-  /**
-   * Converts the object to a string representation
-   * @param obj the object to convert
-   * @return the string representation of the object
-   * @throws IOException if the object cannot be converted
-   */
-  public String toString(T obj)  throws IOException;
-  
-  /**
-   * Restores the object from its string representation.
-   * @param str the string representation of the object
-   * @return restored object
-   * @throws IOException if the object cannot be restored
-   */
-  public T fromString(String str) throws IOException;
-  
-  
-  /** 
-   * Closes this object. 
-   * @throws IOException if an I/O error occurs 
-   * */
-  public void close() throws IOException;
-  
+    /**
+     * Converts the object to a string representation
+     * @param obj the object to convert
+     * @return the string representation of the object
+     * @throws IOException if the object cannot be converted
+     */
+    public String toString(T obj) throws IOException;
+
+    /**
+     * Restores the object from its string representation.
+     * @param str the string representation of the object
+     * @return restored object
+     * @throws IOException if the object cannot be restored
+     */
+    public T fromString(String str) throws IOException;
+
+
+    /**
+     * Closes this object.
+     * @throws IOException if an I/O error occurs
+     * */
+    public void close() throws IOException;
+
 }

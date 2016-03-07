@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,7 +28,7 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
  * Preferences dialog. By sub-classing <tt>FieldEditorPreferencePage</tt>,
  * we can use the field support built into JFace that allows us to create a
  * page that is small and knows how to save, restore and apply itself.
- * 
+ *
  * <p>
  * This page is used to modify preferences only. They are stored in the
  * preference store that belongs to the main plug-in class. That way,
@@ -36,29 +36,29 @@ import org.eclipse.ui.IWorkbenchPreferencePage;
  */
 
 public class MapReducePreferencePage extends FieldEditorPreferencePage
-    implements IWorkbenchPreferencePage {
+        implements IWorkbenchPreferencePage {
 
-  public MapReducePreferencePage() {
-    super(GRID);
-    setPreferenceStore(Activator.getDefault().getPreferenceStore());
-    setTitle("Hadoop Map/Reduce Tools");
-    // setDescription("Hadoop Map/Reduce Preferences");
-  }
+    public MapReducePreferencePage() {
+        super(GRID);
+        setPreferenceStore(Activator.getDefault().getPreferenceStore());
+        setTitle("Hadoop Map/Reduce Tools");
+        // setDescription("Hadoop Map/Reduce Preferences");
+    }
 
-  /**
-   * Creates the field editors. Field editors are abstractions of the common
-   * GUI blocks needed to manipulate various types of preferences. Each field
-   * editor knows how to save and restore itself.
-   */
-  @Override
-  public void createFieldEditors() {
-    addField(new DirectoryFieldEditor(PreferenceConstants.P_PATH,
-        "&Hadoop installation directory:", getFieldEditorParent()));
+    /**
+     * Creates the field editors. Field editors are abstractions of the common
+     * GUI blocks needed to manipulate various types of preferences. Each field
+     * editor knows how to save and restore itself.
+     */
+    @Override
+    public void createFieldEditors() {
+        addField(new DirectoryFieldEditor(PreferenceConstants.P_PATH,
+                "&Hadoop installation directory:", getFieldEditorParent()));
 
-  }
+    }
 
-  /* @inheritDoc */
-  public void init(IWorkbench workbench) {
-  }
+    /* @inheritDoc */
+    public void init(IWorkbench workbench) {
+    }
 
 }

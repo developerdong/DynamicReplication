@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,91 +29,91 @@ import org.apache.hadoop.metrics.util.MBeanUtil;
  *
  */
 class RpcMgt implements RpcMgtMBean {
-  private RpcMetrics myMetrics;
-  private Server myServer;
-  private ObjectName mbeanName;
-  
-  RpcMgt(final String serviceName, final String port,
-                final RpcMetrics metrics, Server server) {
-    myMetrics = metrics;
-    myServer = server;
-    mbeanName = MBeanUtil.registerMBean(serviceName,
-                    "RpcStatisticsForPort" + port, this);
-  }
+    private RpcMetrics myMetrics;
+    private Server myServer;
+    private ObjectName mbeanName;
 
-  public void shutdown() {
-    if (mbeanName != null)
-      MBeanUtil.unregisterMBean(mbeanName);
-  }
-  
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgProcessingTime() {
-    return myMetrics.rpcProcessingTime.getPreviousIntervalAverageTime();
-  }
-  
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgProcessingTimeMax() {
-    return myMetrics.rpcProcessingTime.getMaxTime();
-  }
+    RpcMgt(final String serviceName, final String port,
+           final RpcMetrics metrics, Server server) {
+        myMetrics = metrics;
+        myServer = server;
+        mbeanName = MBeanUtil.registerMBean(serviceName,
+                "RpcStatisticsForPort" + port, this);
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgProcessingTimeMin() {
-    return myMetrics.rpcProcessingTime.getMinTime();
-  }
+    public void shutdown() {
+        if (mbeanName != null)
+            MBeanUtil.unregisterMBean(mbeanName);
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgQueueTime() {
-    return myMetrics.rpcQueueTime.getPreviousIntervalAverageTime();
-  }
-  
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgQueueTimeMax() {
-    return myMetrics.rpcQueueTime.getMaxTime();
-  }
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgProcessingTime() {
+        return myMetrics.rpcProcessingTime.getPreviousIntervalAverageTime();
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public long getRpcOpsAvgQueueTimeMin() {
-    return myMetrics.rpcQueueTime.getMinTime();
-  }
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgProcessingTimeMax() {
+        return myMetrics.rpcProcessingTime.getMaxTime();
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public int getRpcOpsNumber() {
-    return myMetrics.rpcProcessingTime.getPreviousIntervalNumOps() ;
-  }
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgProcessingTimeMin() {
+        return myMetrics.rpcProcessingTime.getMinTime();
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public int getNumOpenConnections() {
-    return myServer.getNumOpenConnections();
-  }
-  
-  /**
-   * @inheritDoc
-   */
-  public int getCallQueueLen() {
-    return myServer.getCallQueueLen();
-  }
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgQueueTime() {
+        return myMetrics.rpcQueueTime.getPreviousIntervalAverageTime();
+    }
 
-  /**
-   * @inheritDoc
-   */
-  public void resetAllMinMax() {
-    myMetrics.rpcProcessingTime.resetMinMax();
-    myMetrics.rpcQueueTime.resetMinMax();
-  }
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgQueueTimeMax() {
+        return myMetrics.rpcQueueTime.getMaxTime();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public long getRpcOpsAvgQueueTimeMin() {
+        return myMetrics.rpcQueueTime.getMinTime();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int getRpcOpsNumber() {
+        return myMetrics.rpcProcessingTime.getPreviousIntervalNumOps();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int getNumOpenConnections() {
+        return myServer.getNumOpenConnections();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public int getCallQueueLen() {
+        return myServer.getCallQueueLen();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public void resetAllMinMax() {
+        myMetrics.rpcProcessingTime.resetMinMax();
+        myMetrics.rpcQueueTime.resetMinMax();
+    }
 }

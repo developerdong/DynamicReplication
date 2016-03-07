@@ -1,11 +1,10 @@
 /**
- *
  * Licensed under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
@@ -13,7 +12,7 @@
  * permissions and limitations under the License.
  *
  * @author: Sriram Rao (Kosmix Corp.)
- * 
+ * <p>
  * Provide the implementation of KFS which turn into calls to KfsAccess.
  */
 
@@ -36,11 +35,11 @@ class KFSImpl implements IFSImpl {
 
     @Deprecated
     public KFSImpl(String metaServerHost, int metaServerPort
-                   ) throws IOException {
-      this(metaServerHost, metaServerPort, null);
+    ) throws IOException {
+        this(metaServerHost, metaServerPort, null);
     }
 
-    public KFSImpl(String metaServerHost, int metaServerPort, 
+    public KFSImpl(String metaServerHost, int metaServerPort,
                    FileSystem.Statistics stats) throws IOException {
         kfsAccess = new KfsAccess(metaServerHost, metaServerPort);
         statistics = stats;
@@ -84,11 +83,11 @@ class KFSImpl implements IFSImpl {
                 fstatus[j] = new FileStatus(0, true, 1, 0, fattr[i].modificationTime, fn);
             else
                 fstatus[j] = new FileStatus(fattr[i].filesize, fattr[i].isDirectory,
-                                            fattr[i].replication,
-                                            (long)
-                                            (1 << 26),
-                                            fattr[i].modificationTime,
-                                            fn);
+                        fattr[i].replication,
+                        (long)
+                                (1 << 26),
+                        fattr[i].modificationTime,
+                        fn);
 
             j++;
         }
@@ -133,12 +132,12 @@ class KFSImpl implements IFSImpl {
     }
 
     public FSDataOutputStream create(String path, short replication, int bufferSize) throws IOException {
-        return new FSDataOutputStream(new KFSOutputStream(kfsAccess, path, replication), 
-                                      statistics);
+        return new FSDataOutputStream(new KFSOutputStream(kfsAccess, path, replication),
+                statistics);
     }
 
     public FSDataInputStream open(String path, int bufferSize) throws IOException {
-        return new FSDataInputStream(new KFSInputStream(kfsAccess, path, 
-                                                        statistics));
+        return new FSDataInputStream(new KFSInputStream(kfsAccess, path,
+                statistics));
     }
 }

@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,22 +28,22 @@ import org.apache.hadoop.util.MemoryCalculatorPlugin;
  */
 public class DummyMemoryCalculatorPlugin extends MemoryCalculatorPlugin {
 
-  /** max vmem on the TT */
-  public static final String MAXVMEM_TESTING_PROPERTY =
-      "mapred.tasktracker.maxvmem.testing";
-  /** max pmem on the TT */
-  public static final String MAXPMEM_TESTING_PROPERTY =
-      "mapred.tasktracker.maxpmem.testing";
+    /** max vmem on the TT */
+    public static final String MAXVMEM_TESTING_PROPERTY =
+            "mapred.tasktracker.maxvmem.testing";
+    /** max pmem on the TT */
+    public static final String MAXPMEM_TESTING_PROPERTY =
+            "mapred.tasktracker.maxpmem.testing";
 
-  /** {@inheritDoc} */
-  @Override
-  public long getVirtualMemorySize() {
-    return getConf().getLong(MAXVMEM_TESTING_PROPERTY, -1);
-  }
+    /** {@inheritDoc} */
+    @Override
+    public long getVirtualMemorySize() {
+        return getConf().getLong(MAXVMEM_TESTING_PROPERTY, -1);
+    }
 
-  /** {@inheritDoc} */
-  @Override
-  public long getPhysicalMemorySize() {
-    return getConf().getLong(MAXPMEM_TESTING_PROPERTY, -1);
-  }
+    /** {@inheritDoc} */
+    @Override
+    public long getPhysicalMemorySize() {
+        return getConf().getLong(MAXPMEM_TESTING_PROPERTY, -1);
+    }
 }

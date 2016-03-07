@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,25 +20,25 @@ package org.apache.hadoop.eclipse.dfs;
 
 public enum DFSActions {
 
-  DELETE("Delete"), REFRESH("Refresh"), DOWNLOAD("Download from DFS..."), OPEN(
-      "View"), MKDIR("Create new directory..."), UPLOAD_FILES(
-      "Upload files to DFS..."), UPLOAD_DIR("Upload directory to DFS..."), RECONNECT(
-      "Reconnect"), DISCONNECT("Disconnect");
+    DELETE("Delete"), REFRESH("Refresh"), DOWNLOAD("Download from DFS..."), OPEN(
+            "View"), MKDIR("Create new directory..."), UPLOAD_FILES(
+            "Upload files to DFS..."), UPLOAD_DIR("Upload directory to DFS..."), RECONNECT(
+            "Reconnect"), DISCONNECT("Disconnect");
 
-  final String title;
+    final String title;
 
-  final String id;
+    final String id;
 
-  private static final String PREFIX = "dfs.browser.action.";
+    private static final String PREFIX = "dfs.browser.action.";
 
-  public static DFSActions getById(String def) {
-    if (!def.startsWith(PREFIX))
-      return null;
-    return valueOf(def.substring(PREFIX.length()).toUpperCase());
-  }
+    public static DFSActions getById(String def) {
+        if (!def.startsWith(PREFIX))
+            return null;
+        return valueOf(def.substring(PREFIX.length()).toUpperCase());
+    }
 
-  DFSActions(String title) {
-    this.title = title;
-    this.id = PREFIX + this.name().toLowerCase();
-  }
+    DFSActions(String title) {
+        this.title = title;
+        this.id = PREFIX + this.name().toLowerCase();
+    }
 }

@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -28,20 +28,26 @@ package org.apache.hadoop.net;
  */
 
 public interface Node {
-  /** Return the string representation of this node's network location */
-  public String getNetworkLocation();
-  /** Set the node's network location */
-  public void setNetworkLocation(String location);
-  /** Return this node's name */
-  public String getName();
-  /** Return this node's parent */
-  public Node getParent();
-  /** Set this node's parent */
-  public void setParent(Node parent);
-  /** Return this node's level in the tree.
-   * E.g. the root of a tree returns 0 and its children return 1
-   */
-  public int getLevel();
-  /** Set this node's level in the tree.*/
-  public void setLevel(int i);
+    /** Return the string representation of this node's network location */
+    public String getNetworkLocation();
+
+    /** Set the node's network location */
+    public void setNetworkLocation(String location);
+
+    /** Return this node's name */
+    public String getName();
+
+    /** Return this node's parent */
+    public Node getParent();
+
+    /** Set this node's parent */
+    public void setParent(Node parent);
+
+    /** Return this node's level in the tree.
+     * E.g. the root of a tree returns 0 and its children return 1
+     */
+    public int getLevel();
+
+    /** Set this node's level in the tree.*/
+    public void setLevel(int i);
 }

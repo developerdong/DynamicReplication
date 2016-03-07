@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,38 +39,38 @@ import org.eclipse.ui.cheatsheets.ICheatSheetManager;
  */
 
 public class OpenNewMRClassWizardAction extends Action implements
-    ICheatSheetAction {
+        ICheatSheetAction {
 
-  static Logger log = Logger.getLogger(OpenNewMRClassWizardAction.class
-      .getName());
+    static Logger log = Logger.getLogger(OpenNewMRClassWizardAction.class
+            .getName());
 
-  public void run(String[] params, ICheatSheetManager manager) {
+    public void run(String[] params, ICheatSheetManager manager) {
 
-    if ((params != null) && (params.length > 0)) {
-      IWorkbench workbench = PlatformUI.getWorkbench();
-      INewWizard wizard = getWizard(params[0]);
-      wizard.init(workbench, new StructuredSelection());
-      WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench()
-          .getActiveWorkbenchWindow().getShell(), wizard);
-      dialog.create();
-      dialog.open();
+        if ((params != null) && (params.length > 0)) {
+            IWorkbench workbench = PlatformUI.getWorkbench();
+            INewWizard wizard = getWizard(params[0]);
+            wizard.init(workbench, new StructuredSelection());
+            WizardDialog dialog = new WizardDialog(PlatformUI.getWorkbench()
+                    .getActiveWorkbenchWindow().getShell(), wizard);
+            dialog.create();
+            dialog.open();
 
-      // did the wizard succeed ?
-      notifyResult(dialog.getReturnCode() == Window.OK);
+            // did the wizard succeed ?
+            notifyResult(dialog.getReturnCode() == Window.OK);
+        }
     }
-  }
 
-  private INewWizard getWizard(String typeName) {
-    if (typeName.equals("Mapper")) {
-      return new NewMapperWizard();
-    } else if (typeName.equals("Reducer")) {
-      return new NewReducerWizard();
-    } else if (typeName.equals("Driver")) {
-      return new NewDriverWizard();
-    } else {
-      log.severe("Invalid Wizard requested");
-      return null;
+    private INewWizard getWizard(String typeName) {
+        if (typeName.equals("Mapper")) {
+            return new NewMapperWizard();
+        } else if (typeName.equals("Reducer")) {
+            return new NewReducerWizard();
+        } else if (typeName.equals("Driver")) {
+            return new NewDriverWizard();
+        } else {
+            log.severe("Invalid Wizard requested");
+            return null;
+        }
     }
-  }
 
 }

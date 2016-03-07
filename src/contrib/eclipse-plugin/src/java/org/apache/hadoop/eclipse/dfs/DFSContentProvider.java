@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -35,9 +35,9 @@ import org.eclipse.swt.widgets.Display;
 /**
  * Handles viewing of DFS locations
  * <p>
- * 
+ *
  * The content handled by this provider is a tree:
- * 
+ *
  * <tt>
  * <br>DFSLocationsRoot
  * <br>\_HadoopServer
@@ -47,198 +47,198 @@ import org.eclipse.swt.widgets.Display;
  * <br>| ...
  * <br>\_HadoopServer...
  * </tt>
- * 
+ *
  * The code should not block here: blocking operations need to be done
  * asynchronously so as not to freeze the UI!
  */
 public class DFSContentProvider implements ITreeContentProvider,
-    ILabelProvider {
+        ILabelProvider {
 
-  /**
-   * The viewer that displays this Tree content
-   */
-  private Viewer viewer;
+    /**
+     * The viewer that displays this Tree content
+     */
+    private Viewer viewer;
 
-  private StructuredViewer sviewer;
+    private StructuredViewer sviewer;
 
-  private Map<HadoopServer, DFSContent> rootFolders =
-      new HashMap<HadoopServer, DFSContent>();
+    private Map<HadoopServer, DFSContent> rootFolders =
+            new HashMap<HadoopServer, DFSContent>();
 
-  /**
-   * Constructor: load resources (icons).
-   */
-  public DFSContentProvider() {
-  }
+    /**
+     * Constructor: load resources (icons).
+     */
+    public DFSContentProvider() {
+    }
 
-  private final DFSLocationsRoot locationsRoot = new DFSLocationsRoot(this);
+    private final DFSLocationsRoot locationsRoot = new DFSLocationsRoot(this);
 
   /*
    * ITreeContentProvider implementation
    */
 
-  /* @inheritDoc */
-  public Object[] getChildren(Object parent) {
+    /* @inheritDoc */
+    public Object[] getChildren(Object parent) {
 
-    if (!(parent instanceof DFSContent))
-      return null;
-    DFSContent content = (DFSContent) parent;
-    return content.getChildren();
-  }
-
-  public Object[] test(Object parentElement) {
-    if (parentElement instanceof DFSLocationsRoot) {
-      return ServerRegistry.getInstance().getServers().toArray();
-
-    } else if (parentElement instanceof HadoopServer) {
-      final HadoopServer location = (HadoopServer) parentElement;
-      Object root = rootFolders.get(location);
-      if (root != null)
-        return new Object[] { root };
-
-      return new Object[] { "Connecting to DFS..." };
-
-    } else if (parentElement instanceof DFSFolder) {
-      DFSFolder folder = (DFSFolder) parentElement;
-      return folder.getChildren();
+        if (!(parent instanceof DFSContent))
+            return null;
+        DFSContent content = (DFSContent) parent;
+        return content.getChildren();
     }
 
-    return new Object[] { "<Unknown DFSContent>" };
-  }
+    public Object[] test(Object parentElement) {
+        if (parentElement instanceof DFSLocationsRoot) {
+            return ServerRegistry.getInstance().getServers().toArray();
 
-  /* @inheritDoc */
-  public Object getParent(Object element) {
+        } else if (parentElement instanceof HadoopServer) {
+            final HadoopServer location = (HadoopServer) parentElement;
+            Object root = rootFolders.get(location);
+            if (root != null)
+                return new Object[]{root};
 
-    if (element instanceof DFSPath) {
-      return ((DFSPath) element).getParent();
+            return new Object[]{"Connecting to DFS..."};
 
-    } else if (element instanceof HadoopServer) {
-      return locationsRoot;
+        } else if (parentElement instanceof DFSFolder) {
+            DFSFolder folder = (DFSFolder) parentElement;
+            return folder.getChildren();
+        }
+
+        return new Object[]{"<Unknown DFSContent>"};
     }
 
-    return null;
-  }
+    /* @inheritDoc */
+    public Object getParent(Object element) {
 
-  /* @inheritDoc */
-  public boolean hasChildren(Object element) {
-    if (element instanceof DFSContent) {
-      DFSContent content = (DFSContent) element;
-      return content.hasChildren();
+        if (element instanceof DFSPath) {
+            return ((DFSPath) element).getParent();
+
+        } else if (element instanceof HadoopServer) {
+            return locationsRoot;
+        }
+
+        return null;
     }
-    return false;
-  }
+
+    /* @inheritDoc */
+    public boolean hasChildren(Object element) {
+        if (element instanceof DFSContent) {
+            DFSContent content = (DFSContent) element;
+            return content.hasChildren();
+        }
+        return false;
+    }
 
   /*
    * IStructureContentProvider implementation
    */
 
-  /* @inheritDoc */
-  public Object[] getElements(final Object inputElement) {
-    return new Object[] { locationsRoot };
-    // return ServerRegistry.getInstance().getServers().toArray();
-  }
+    /* @inheritDoc */
+    public Object[] getElements(final Object inputElement) {
+        return new Object[]{locationsRoot};
+        // return ServerRegistry.getInstance().getServers().toArray();
+    }
 
   /*
    * ILabelProvider implementation
    */
 
-  /* @inheritDoc */
-  public Image getImage(Object element) {
-    if (element instanceof DFSLocationsRoot)
-      return ImageLibrary.getImage("dfs.browser.root.entry");
+    /* @inheritDoc */
+    public Image getImage(Object element) {
+        if (element instanceof DFSLocationsRoot)
+            return ImageLibrary.getImage("dfs.browser.root.entry");
 
-    else if (element instanceof DFSLocation)
-      return ImageLibrary.getImage("dfs.browser.location.entry");
+        else if (element instanceof DFSLocation)
+            return ImageLibrary.getImage("dfs.browser.location.entry");
 
-    else if (element instanceof DFSFolder)
-      return ImageLibrary.getImage("dfs.browser.folder.entry");
+        else if (element instanceof DFSFolder)
+            return ImageLibrary.getImage("dfs.browser.folder.entry");
 
-    else if (element instanceof DFSFile)
-      return ImageLibrary.getImage("dfs.browser.file.entry");
+        else if (element instanceof DFSFile)
+            return ImageLibrary.getImage("dfs.browser.file.entry");
 
-    return null;
-  }
+        return null;
+    }
 
-  /* @inheritDoc */
-  public String getText(Object element) {
-    if (element instanceof DFSFile)
-      return ((DFSFile) element).toDetailedString();
+    /* @inheritDoc */
+    public String getText(Object element) {
+        if (element instanceof DFSFile)
+            return ((DFSFile) element).toDetailedString();
 
-    return element.toString();
-  }
+        return element.toString();
+    }
 
   /*
    * IBaseLabelProvider implementation
    */
 
-  /* @inheritDoc */
-  public void addListener(ILabelProviderListener listener) {
-  }
+    /* @inheritDoc */
+    public void addListener(ILabelProviderListener listener) {
+    }
 
-  /* @inheritDoc */
-  public void removeListener(ILabelProviderListener listener) {
-  }
+    /* @inheritDoc */
+    public void removeListener(ILabelProviderListener listener) {
+    }
 
-  /* @inheritDoc */
-  public boolean isLabelProperty(Object element, String property) {
-    return false;
-  }
+    /* @inheritDoc */
+    public boolean isLabelProperty(Object element, String property) {
+        return false;
+    }
 
   /*
    * IContentProvider implementation
    */
 
-  /* @inheritDoc */
-  public void dispose() {
-  }
+    /* @inheritDoc */
+    public void dispose() {
+    }
 
-  /* @inheritDoc */
-  public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
-    this.viewer = viewer;
-    if ((viewer != null) && (viewer instanceof StructuredViewer))
-      this.sviewer = (StructuredViewer) viewer;
-    else
-      this.sviewer = null;
-  }
+    /* @inheritDoc */
+    public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
+        this.viewer = viewer;
+        if ((viewer != null) && (viewer instanceof StructuredViewer))
+            this.sviewer = (StructuredViewer) viewer;
+        else
+            this.sviewer = null;
+    }
 
   /*
    * Miscellaneous
    */
 
-  /**
-   * Ask the viewer for this content to refresh
-   */
-  void refresh() {
-    // no display, nothing to update
-    if (this.viewer == null)
-      return;
+    /**
+     * Ask the viewer for this content to refresh
+     */
+    void refresh() {
+        // no display, nothing to update
+        if (this.viewer == null)
+            return;
 
-    Display.getDefault().asyncExec(new Runnable() {
-      public void run() {
-        DFSContentProvider.this.viewer.refresh();
-      }
-    });
-  }
-
-  /**
-   * Ask the viewer to refresh a single element
-   * 
-   * @param content what to refresh
-   */
-  void refresh(final DFSContent content) {
-    if (this.sviewer != null) {
-      Display.getDefault().asyncExec(new Runnable() {
-        public void run() {
-          DFSContentProvider.this.sviewer.refresh(content);
-        }
-      });
-
-    } else {
-      refresh();
+        Display.getDefault().asyncExec(new Runnable() {
+            public void run() {
+                DFSContentProvider.this.viewer.refresh();
+            }
+        });
     }
-  }
 
-  Viewer getViewer() {
-    return this.viewer;
-  }
+    /**
+     * Ask the viewer to refresh a single element
+     *
+     * @param content what to refresh
+     */
+    void refresh(final DFSContent content) {
+        if (this.sviewer != null) {
+            Display.getDefault().asyncExec(new Runnable() {
+                public void run() {
+                    DFSContentProvider.this.sviewer.refresh(content);
+                }
+            });
+
+        } else {
+            refresh();
+        }
+    }
+
+    Viewer getViewer() {
+        return this.viewer;
+    }
 
 }

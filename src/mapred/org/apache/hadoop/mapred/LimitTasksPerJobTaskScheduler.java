@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,67 +34,67 @@ import org.apache.hadoop.conf.Configuration;
  * property.
  */
 class LimitTasksPerJobTaskScheduler extends JobQueueTaskScheduler {
-  
-  private static final Log LOG = LogFactory.getLog(
-    "org.apache.hadoop.mapred.TaskLimitedJobQueueTaskScheduler");
-  
-  public static final String MAX_TASKS_PER_JOB_PROPERTY = 
-    "mapred.jobtracker.taskScheduler.maxRunningTasksPerJob";
-  
-  private long maxTasksPerJob;
-  
-  public LimitTasksPerJobTaskScheduler() {
-    super();
-  }
-  
-  @Override
-  public synchronized void start() throws IOException {
-    super.start();
-    QueueManager queueManager = taskTrackerManager.getQueueManager();
-    String queueName = queueManager.getJobQueueInfos()[0].getQueueName();
-    queueManager.setSchedulerInfo(queueName
-        ,"Maximum Tasks Per Job :: " + String.valueOf(maxTasksPerJob));
-  }
-  
-  @Override
-  public synchronized void setConf(Configuration conf) {
-    super.setConf(conf);
-    maxTasksPerJob = conf.getLong(MAX_TASKS_PER_JOB_PROPERTY ,Long.MAX_VALUE);
-    if (maxTasksPerJob <= 0) {
-      String msg = MAX_TASKS_PER_JOB_PROPERTY +
-        " is set to zero or a negative value. Aborting.";
-      LOG.fatal(msg);
-      throw new RuntimeException (msg);
+
+    private static final Log LOG = LogFactory.getLog(
+            "org.apache.hadoop.mapred.TaskLimitedJobQueueTaskScheduler");
+
+    public static final String MAX_TASKS_PER_JOB_PROPERTY =
+            "mapred.jobtracker.taskScheduler.maxRunningTasksPerJob";
+
+    private long maxTasksPerJob;
+
+    public LimitTasksPerJobTaskScheduler() {
+        super();
     }
-  }
 
-  @Override
-  public synchronized List<Task> assignTasks(TaskTrackerStatus taskTracker)
-      throws IOException {
+    @Override
+    public synchronized void start() throws IOException {
+        super.start();
+        QueueManager queueManager = taskTrackerManager.getQueueManager();
+        String queueName = queueManager.getJobQueueInfos()[0].getQueueName();
+        queueManager.setSchedulerInfo(queueName
+                , "Maximum Tasks Per Job :: " + String.valueOf(maxTasksPerJob));
+    }
 
-    final int numTaskTrackers =
-        taskTrackerManager.getClusterStatus().getTaskTrackers();
-    Collection<JobInProgress> jobQueue =
-      jobQueueJobInProgressListener.getJobQueue();
-    Task task;
+    @Override
+    public synchronized void setConf(Configuration conf) {
+        super.setConf(conf);
+        maxTasksPerJob = conf.getLong(MAX_TASKS_PER_JOB_PROPERTY, Long.MAX_VALUE);
+        if (maxTasksPerJob <= 0) {
+            String msg = MAX_TASKS_PER_JOB_PROPERTY +
+                    " is set to zero or a negative value. Aborting.";
+            LOG.fatal(msg);
+            throw new RuntimeException(msg);
+        }
+    }
+
+    @Override
+    public synchronized List<Task> assignTasks(TaskTrackerStatus taskTracker)
+            throws IOException {
+
+        final int numTaskTrackers =
+                taskTrackerManager.getClusterStatus().getTaskTrackers();
+        Collection<JobInProgress> jobQueue =
+                jobQueueJobInProgressListener.getJobQueue();
+        Task task;
 
     /* Stats about the current taskTracker */
-    final int mapTasksNumber = taskTracker.countMapTasks();
-    final int reduceTasksNumber = taskTracker.countReduceTasks();
-    final int maximumMapTasksNumber = taskTracker.getMaxMapTasks();
-    final int maximumReduceTasksNumber = taskTracker.getMaxReduceTasks();
+        final int mapTasksNumber = taskTracker.countMapTasks();
+        final int reduceTasksNumber = taskTracker.countReduceTasks();
+        final int maximumMapTasksNumber = taskTracker.getMaxMapTasks();
+        final int maximumReduceTasksNumber = taskTracker.getMaxReduceTasks();
 
     /*
      * Statistics about the whole cluster. Most are approximate because of
      * concurrency
      */
-    final int[] maxMapAndReduceLoad = getMaxMapAndReduceLoad(
-        maximumMapTasksNumber, maximumReduceTasksNumber);
-    final int maximumMapLoad = maxMapAndReduceLoad[0];
-    final int maximumReduceLoad = maxMapAndReduceLoad[1];
+        final int[] maxMapAndReduceLoad = getMaxMapAndReduceLoad(
+                maximumMapTasksNumber, maximumReduceTasksNumber);
+        final int maximumMapLoad = maxMapAndReduceLoad[0];
+        final int maximumReduceLoad = maxMapAndReduceLoad[1];
 
-    
-    final int beginAtStep;
+
+        final int beginAtStep;
     /*
      * When step == 0, this loop starts as many map tasks it can wrt
      * maxTasksPerJob
@@ -114,86 +114,84 @@ class LimitTasksPerJobTaskScheduler extends JobQueueTaskScheduler {
      * would be in ln(N).
      * So it is not a good idea.
      */
-    if (maxTasksPerJob != Long.MAX_VALUE) {
-      beginAtStep = 0;
-    }
-    else {
-      beginAtStep = 2;
-    }
-    List<Task> assignedTasks = new ArrayList<Task>();
-    scheduleTasks:
-    for (int step = beginAtStep; step <= 3; ++step) {
+        if (maxTasksPerJob != Long.MAX_VALUE) {
+            beginAtStep = 0;
+        } else {
+            beginAtStep = 2;
+        }
+        List<Task> assignedTasks = new ArrayList<Task>();
+        scheduleTasks:
+        for (int step = beginAtStep; step <= 3; ++step) {
       /* If we reached the maximum load for this step, go to the next */
-      if ((step == 0 || step == 2) && mapTasksNumber >= maximumMapLoad ||
-          (step == 1 || step == 3) && reduceTasksNumber >= maximumReduceLoad) {
-        continue;
-      }
+            if ((step == 0 || step == 2) && mapTasksNumber >= maximumMapLoad ||
+                    (step == 1 || step == 3) && reduceTasksNumber >= maximumReduceLoad) {
+                continue;
+            }
       /* For each job, start its tasks */
-      synchronized (jobQueue) {
-        for (JobInProgress job : jobQueue) {
+            synchronized (jobQueue) {
+                for (JobInProgress job : jobQueue) {
           /* Ignore non running jobs */
-          if (job.getStatus().getRunState() != JobStatus.RUNNING) {
-            continue;
-          }
+                    if (job.getStatus().getRunState() != JobStatus.RUNNING) {
+                        continue;
+                    }
           /* Check that we're not exceeding the global limits */
-          if ((step == 0 || step == 1)
-              && (job.runningMaps() + job.runningReduces() >= maxTasksPerJob)) {
-            continue;
-          }
-          if (step == 0 || step == 2) {
-            task = job.obtainNewMapTask(taskTracker, numTaskTrackers,
-                taskTrackerManager.getNumberOfUniqueHosts());
-          }
-          else {
-            task = job.obtainNewReduceTask(taskTracker, numTaskTrackers,
-                taskTrackerManager.getNumberOfUniqueHosts());
-          }
-          if (task != null) {
-            assignedTasks.add(task);
-            break scheduleTasks;
-          }
+                    if ((step == 0 || step == 1)
+                            && (job.runningMaps() + job.runningReduces() >= maxTasksPerJob)) {
+                        continue;
+                    }
+                    if (step == 0 || step == 2) {
+                        task = job.obtainNewMapTask(taskTracker, numTaskTrackers,
+                                taskTrackerManager.getNumberOfUniqueHosts());
+                    } else {
+                        task = job.obtainNewReduceTask(taskTracker, numTaskTrackers,
+                                taskTrackerManager.getNumberOfUniqueHosts());
+                    }
+                    if (task != null) {
+                        assignedTasks.add(task);
+                        break scheduleTasks;
+                    }
+                }
+            }
         }
-      }
+        return assignedTasks;
     }
-    return assignedTasks;
-  }
 
-  /**
-   * Determine the maximum number of maps or reduces that we are willing to run
-   * on a taskTracker which accept a maximum of localMaxMapLoad maps and
-   * localMaxReduceLoad reduces
-   * @param localMaxMapLoad The local maximum number of map tasks for a host
-   * @param localMaxReduceLoad The local maximum number of reduce tasks for a
-   * host
-   * @return An array of the two maximums: map then reduce.
-   */
-  protected synchronized int[] getMaxMapAndReduceLoad(int localMaxMapLoad,
-      int localMaxReduceLoad) {
-    // Approximate because of concurrency
-    final int numTaskTrackers =
-      taskTrackerManager.getClusterStatus().getTaskTrackers();
+    /**
+     * Determine the maximum number of maps or reduces that we are willing to run
+     * on a taskTracker which accept a maximum of localMaxMapLoad maps and
+     * localMaxReduceLoad reduces
+     * @param localMaxMapLoad The local maximum number of map tasks for a host
+     * @param localMaxReduceLoad The local maximum number of reduce tasks for a
+     * host
+     * @return An array of the two maximums: map then reduce.
+     */
+    protected synchronized int[] getMaxMapAndReduceLoad(int localMaxMapLoad,
+                                                        int localMaxReduceLoad) {
+        // Approximate because of concurrency
+        final int numTaskTrackers =
+                taskTrackerManager.getClusterStatus().getTaskTrackers();
     /* Hold the result */
-    int maxMapLoad = 0;
-    int maxReduceLoad = 0;
-    int neededMaps = 0;
-    int neededReduces = 0;
-    Collection<JobInProgress> jobQueue =
-      jobQueueJobInProgressListener.getJobQueue();
-    synchronized (jobQueue) {
-      for (JobInProgress job : jobQueue) {
-        if (job.getStatus().getRunState() == JobStatus.RUNNING) {
-          neededMaps += job.desiredMaps() - job.finishedMaps();
-          neededReduces += job.desiredReduces() - job.finishedReduces();
+        int maxMapLoad = 0;
+        int maxReduceLoad = 0;
+        int neededMaps = 0;
+        int neededReduces = 0;
+        Collection<JobInProgress> jobQueue =
+                jobQueueJobInProgressListener.getJobQueue();
+        synchronized (jobQueue) {
+            for (JobInProgress job : jobQueue) {
+                if (job.getStatus().getRunState() == JobStatus.RUNNING) {
+                    neededMaps += job.desiredMaps() - job.finishedMaps();
+                    neededReduces += job.desiredReduces() - job.finishedReduces();
+                }
+            }
         }
-      }
+        if (numTaskTrackers > 0) {
+            maxMapLoad = Math.min(localMaxMapLoad, (int) Math
+                    .ceil((double) neededMaps / numTaskTrackers));
+            maxReduceLoad = Math.min(localMaxReduceLoad, (int) Math
+                    .ceil((double) neededReduces / numTaskTrackers));
+        }
+        return new int[]{maxMapLoad, maxReduceLoad};
     }
-    if (numTaskTrackers > 0) {
-      maxMapLoad = Math.min(localMaxMapLoad, (int) Math
-          .ceil((double) neededMaps / numTaskTrackers));
-      maxReduceLoad = Math.min(localMaxReduceLoad, (int) Math
-          .ceil((double) neededReduces / numTaskTrackers));
-    }
-    return new int[] { maxMapLoad, maxReduceLoad };
-  }
 
 }

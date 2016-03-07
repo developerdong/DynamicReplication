@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,32 +29,32 @@ import org.apache.hadoop.mapred.Partitioner;
  * same shard - in the same partition.
  */
 public class IndexUpdatePartitioner implements
-    Partitioner<Shard, IntermediateForm> {
+        Partitioner<Shard, IntermediateForm> {
 
-  private Shard[] shards;
-  private Map<Shard, Integer> map;
+    private Shard[] shards;
+    private Map<Shard, Integer> map;
 
-  /* (non-Javadoc)
-   * @see org.apache.hadoop.mapred.Partitioner#getPartition(java.lang.Object, java.lang.Object, int)
-   */
-  public int getPartition(Shard key, IntermediateForm value, int numPartitions) {
-    int partition = map.get(key).intValue();
-    if (partition < numPartitions) {
-      return partition;
-    } else {
-      return numPartitions - 1;
+    /* (non-Javadoc)
+     * @see org.apache.hadoop.mapred.Partitioner#getPartition(java.lang.Object, java.lang.Object, int)
+     */
+    public int getPartition(Shard key, IntermediateForm value, int numPartitions) {
+        int partition = map.get(key).intValue();
+        if (partition < numPartitions) {
+            return partition;
+        } else {
+            return numPartitions - 1;
+        }
     }
-  }
 
-  /* (non-Javadoc)
-   * @see org.apache.hadoop.mapred.JobConfigurable#configure(org.apache.hadoop.mapred.JobConf)
-   */
-  public void configure(JobConf job) {
-    shards = Shard.getIndexShards(new IndexUpdateConfiguration(job));
-    map = new HashMap<Shard, Integer>();
-    for (int i = 0; i < shards.length; i++) {
-      map.put(shards[i], i);
+    /* (non-Javadoc)
+     * @see org.apache.hadoop.mapred.JobConfigurable#configure(org.apache.hadoop.mapred.JobConf)
+     */
+    public void configure(JobConf job) {
+        shards = Shard.getIndexShards(new IndexUpdateConfiguration(job));
+        map = new HashMap<Shard, Integer>();
+        for (int i = 0; i < shards.length; i++) {
+            map.put(shards[i], i);
+        }
     }
-  }
 
 }

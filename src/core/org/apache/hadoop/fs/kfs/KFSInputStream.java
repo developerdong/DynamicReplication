@@ -1,11 +1,10 @@
 /**
- *
  * Licensed under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
@@ -13,7 +12,7 @@
  * permissions and limitations under the License.
  *
  * @author: Sriram Rao (Kosmix Corp.)
- * 
+ * <p>
  * Implements the Hadoop FSInputStream interfaces to allow applications to read
  * files in Kosmos File System (KFS).
  */
@@ -37,11 +36,11 @@ class KFSInputStream extends FSInputStream {
 
     @Deprecated
     public KFSInputStream(KfsAccess kfsAccess, String path) {
-      this(kfsAccess, path, null);
+        this(kfsAccess, path, null);
     }
 
     public KFSInputStream(KfsAccess kfsAccess, String path,
-                            FileSystem.Statistics stats) {
+                          FileSystem.Statistics stats) {
         this.statistics = stats;
         this.kfsChannel = kfsAccess.kfs_open(path);
         if (this.kfsChannel != null)
@@ -82,10 +81,10 @@ class KFSInputStream extends FSInputStream {
         byte b[] = new byte[1];
         int res = read(b, 0, 1);
         if (res == 1) {
-          if (statistics != null) {
-            statistics.incrementBytesRead(1);
-          }
-          return ((int) (b[0] & 0xff));
+            if (statistics != null) {
+                statistics.incrementBytesRead(1);
+            }
+            return ((int) (b[0] & 0xff));
         }
         return -1;
     }
@@ -94,16 +93,16 @@ class KFSInputStream extends FSInputStream {
         if (kfsChannel == null) {
             throw new IOException("File closed");
         }
-	int res;
+        int res;
 
-	res = kfsChannel.read(ByteBuffer.wrap(b, off, len));
-	// Use -1 to signify EOF
-	if (res == 0)
-	    return -1;
-	if (statistics != null) {
-	  statistics.incrementBytesRead(res);
-	}
-	return res;
+        res = kfsChannel.read(ByteBuffer.wrap(b, off, len));
+        // Use -1 to signify EOF
+        if (res == 0)
+            return -1;
+        if (statistics != null) {
+            statistics.incrementBytesRead(res);
+        }
+        return res;
     }
 
     public synchronized void close() throws IOException {

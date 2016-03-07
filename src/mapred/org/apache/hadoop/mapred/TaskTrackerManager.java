@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,79 +27,79 @@ import java.util.Collection;
  */
 interface TaskTrackerManager {
 
-  /**
-   * @return A collection of the {@link TaskTrackerStatus} for the tasktrackers
-   * being managed.
-   */
-  public Collection<TaskTrackerStatus> taskTrackers();
-  
-  /**
-   * @return The number of unique hosts running tasktrackers.
-   */
-  public int getNumberOfUniqueHosts();
-  
-  /**
-   * @return a summary of the cluster's status.
-   */
-  public ClusterStatus getClusterStatus();
+    /**
+     * @return A collection of the {@link TaskTrackerStatus} for the tasktrackers
+     * being managed.
+     */
+    public Collection<TaskTrackerStatus> taskTrackers();
 
-  /**
-   * Registers a {@link JobInProgressListener} for updates from this
-   * {@link TaskTrackerManager}.
-   * @param jobInProgressListener the {@link JobInProgressListener} to add
-   */
-  public void addJobInProgressListener(JobInProgressListener listener);
+    /**
+     * @return The number of unique hosts running tasktrackers.
+     */
+    public int getNumberOfUniqueHosts();
 
-  /**
-   * Unregisters a {@link JobInProgressListener} from this
-   * {@link TaskTrackerManager}.
-   * @param jobInProgressListener the {@link JobInProgressListener} to remove
-   */
-  public void removeJobInProgressListener(JobInProgressListener listener);
+    /**
+     * @return a summary of the cluster's status.
+     */
+    public ClusterStatus getClusterStatus();
 
-  /**
-   * Return the {@link QueueManager} which manages the queues in this
-   * {@link TaskTrackerManager}.
-   *
-   * @return the {@link QueueManager}
-   */
-  public QueueManager getQueueManager();
-  
-  /**
-   * Return the current heartbeat interval that's used by {@link TaskTracker}s.
-   *
-   * @return the heartbeat interval used by {@link TaskTracker}s
-   */
-  public int getNextHeartbeatInterval();
+    /**
+     * Registers a {@link JobInProgressListener} for updates from this
+     * {@link TaskTrackerManager}.
+     * @param jobInProgressListener the {@link JobInProgressListener} to add
+     */
+    public void addJobInProgressListener(JobInProgressListener listener);
 
-  /**
-   * Kill the job identified by jobid
-   * 
-   * @param jobid
-   * @throws IOException
-   */
-  public void killJob(JobID jobid)
-      throws IOException;
+    /**
+     * Unregisters a {@link JobInProgressListener} from this
+     * {@link TaskTrackerManager}.
+     * @param jobInProgressListener the {@link JobInProgressListener} to remove
+     */
+    public void removeJobInProgressListener(JobInProgressListener listener);
 
-  /**
-   * Obtain the job object identified by jobid
-   * 
-   * @param jobid
-   * @return jobInProgress object
-   */
-  public JobInProgress getJob(JobID jobid);
-  
-  /**
-   * Initialize the Job
-   * 
-   * @param job JobInProgress object
-   */
-  public void initJob(JobInProgress job);
-  
-  /**
-   * Fail a job.
-   * 
-   * @param job JobInProgress object
-   */
-  public void failJob(JobInProgress job);
+    /**
+     * Return the {@link QueueManager} which manages the queues in this
+     * {@link TaskTrackerManager}.
+     *
+     * @return the {@link QueueManager}
+     */
+    public QueueManager getQueueManager();
+
+    /**
+     * Return the current heartbeat interval that's used by {@link TaskTracker}s.
+     *
+     * @return the heartbeat interval used by {@link TaskTracker}s
+     */
+    public int getNextHeartbeatInterval();
+
+    /**
+     * Kill the job identified by jobid
+     *
+     * @param jobid
+     * @throws IOException
+     */
+    public void killJob(JobID jobid)
+            throws IOException;
+
+    /**
+     * Obtain the job object identified by jobid
+     *
+     * @param jobid
+     * @return jobInProgress object
+     */
+    public JobInProgress getJob(JobID jobid);
+
+    /**
+     * Initialize the Job
+     *
+     * @param job JobInProgress object
+     */
+    public void initJob(JobInProgress job);
+
+    /**
+     * Fail a job.
+     *
+     * @param job JobInProgress object
+     */
+    public void failJob(JobInProgress job);
 }

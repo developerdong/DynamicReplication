@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -43,59 +43,59 @@ import org.apache.hadoop.mapred.Reporter;
  * <li><tt>f:</tt> - float, summ</li>
  * <li><tt>l:</tt> - long, summ</li>
  * </ul>
- * 
+ *
  */
 public class AccumulatingReducer extends MapReduceBase
-    implements Reducer<UTF8, UTF8, UTF8, UTF8> {
-  private static final Log LOG = LogFactory.getLog(AccumulatingReducer.class);
-  
-  protected String hostName;
-  
-  public AccumulatingReducer () {
-    LOG.info("Starting AccumulatingReducer !!!");
-    try {
-      hostName = java.net.InetAddress.getLocalHost().getHostName();
-    } catch(Exception e) {
-      hostName = "localhost";
-    }
-    LOG.info("Starting AccumulatingReducer on " + hostName);
-  }
-  
-  public void reduce(UTF8 key, 
-                     Iterator<UTF8> values,
-                     OutputCollector<UTF8, UTF8> output, 
-                     Reporter reporter
-                     ) throws IOException {
-    String field = key.toString();
+        implements Reducer<UTF8, UTF8, UTF8, UTF8> {
+    private static final Log LOG = LogFactory.getLog(AccumulatingReducer.class);
 
-    reporter.setStatus("starting " + field + " ::host = " + hostName);
+    protected String hostName;
 
-    // concatenate strings
-    if (field.startsWith("s:")) {
-      String sSum = "";
-      while (values.hasNext())
-        sSum += values.next().toString() + ";";
-      output.collect(key, new UTF8(sSum));
-      reporter.setStatus("finished " + field + " ::host = " + hostName);
-      return;
+    public AccumulatingReducer() {
+        LOG.info("Starting AccumulatingReducer !!!");
+        try {
+            hostName = java.net.InetAddress.getLocalHost().getHostName();
+        } catch (Exception e) {
+            hostName = "localhost";
+        }
+        LOG.info("Starting AccumulatingReducer on " + hostName);
     }
-    // sum long values
-    if (field.startsWith("f:")) {
-      float fSum = 0;
-      while (values.hasNext())
-        fSum += Float.parseFloat(values.next().toString());
-      output.collect(key, new UTF8(String.valueOf(fSum)));
-      reporter.setStatus("finished " + field + " ::host = " + hostName);
-      return;
+
+    public void reduce(UTF8 key,
+                       Iterator<UTF8> values,
+                       OutputCollector<UTF8, UTF8> output,
+                       Reporter reporter
+    ) throws IOException {
+        String field = key.toString();
+
+        reporter.setStatus("starting " + field + " ::host = " + hostName);
+
+        // concatenate strings
+        if (field.startsWith("s:")) {
+            String sSum = "";
+            while (values.hasNext())
+                sSum += values.next().toString() + ";";
+            output.collect(key, new UTF8(sSum));
+            reporter.setStatus("finished " + field + " ::host = " + hostName);
+            return;
+        }
+        // sum long values
+        if (field.startsWith("f:")) {
+            float fSum = 0;
+            while (values.hasNext())
+                fSum += Float.parseFloat(values.next().toString());
+            output.collect(key, new UTF8(String.valueOf(fSum)));
+            reporter.setStatus("finished " + field + " ::host = " + hostName);
+            return;
+        }
+        // sum long values
+        if (field.startsWith("l:")) {
+            long lSum = 0;
+            while (values.hasNext()) {
+                lSum += Long.parseLong(values.next().toString());
+            }
+            output.collect(key, new UTF8(String.valueOf(lSum)));
+        }
+        reporter.setStatus("finished " + field + " ::host = " + hostName);
     }
-    // sum long values
-    if (field.startsWith("l:")) {
-      long lSum = 0;
-      while (values.hasNext()) {
-        lSum += Long.parseLong(values.next().toString());
-      }
-      output.collect(key, new UTF8(String.valueOf(lSum)));
-    }
-    reporter.setStatus("finished " + field + " ::host = " + hostName);
-  }
 }

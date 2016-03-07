@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -33,19 +33,19 @@ import org.apache.hadoop.util.ReflectionUtils;
  * types, are mapped out to reduce, multiple Value types is not allowed.
  * In this case, this class can help you wrap instances with different types.
  * </p>
- * 
+ *
  * <p>
  * Compared with <code>ObjectWritable</code>, this class is much more effective,
  * because <code>ObjectWritable</code> will append the class declaration as a String 
  * into the output file in every Key-Value pair.
  * </p>
- * 
+ *
  * <p>
  * Generic Writable implements {@link Configurable} interface, so that it will be 
  * configured by the framework. The configuration is passed to the wrapped objects
  * implementing {@link Configurable} interface <i>before deserialization</i>. 
  * </p>
- * 
+ *
  * how to use it: <br>
  * 1. Write your own class, such as GenericObject, which extends GenericWritable.<br> 
  * 2. Implements the abstract method <code>getTypes()</code>, defines 
@@ -53,11 +53,11 @@ import org.apache.hadoop.util.ReflectionUtils;
  *    Attention: this classes defined in <code>getTypes()</code> method, must
  *    implement <code>Writable</code> interface.
  * <br><br>
- * 
+ *
  * The code looks like this:
  * <blockquote><pre>
  * public class GenericObject extends GenericWritable {
- * 
+ *
  *   private static Class[] CLASSES = {
  *               ClassType1.class, 
  *               ClassType2.class,
@@ -70,83 +70,83 @@ import org.apache.hadoop.util.ReflectionUtils;
  *
  * }
  * </pre></blockquote>
- * 
+ *
  * @since Nov 8, 2006
  */
 public abstract class GenericWritable implements Writable, Configurable {
 
-  private static final byte NOT_SET = -1;
+    private static final byte NOT_SET = -1;
 
-  private byte type = NOT_SET;
+    private byte type = NOT_SET;
 
-  private Writable instance;
+    private Writable instance;
 
-  private Configuration conf = null;
-  
-  /**
-   * Set the instance that is wrapped.
-   * 
-   * @param obj
-   */
-  public void set(Writable obj) {
-    instance = obj;
-    Class<? extends Writable> instanceClazz = instance.getClass();
-    Class<? extends Writable>[] clazzes = getTypes();
-    for (int i = 0; i < clazzes.length; i++) {
-      Class<? extends Writable> clazz = clazzes[i];
-      if (clazz.equals(instanceClazz)) {
-        type = (byte) i;
-        return;
-      }
+    private Configuration conf = null;
+
+    /**
+     * Set the instance that is wrapped.
+     *
+     * @param obj
+     */
+    public void set(Writable obj) {
+        instance = obj;
+        Class<? extends Writable> instanceClazz = instance.getClass();
+        Class<? extends Writable>[] clazzes = getTypes();
+        for (int i = 0; i < clazzes.length; i++) {
+            Class<? extends Writable> clazz = clazzes[i];
+            if (clazz.equals(instanceClazz)) {
+                type = (byte) i;
+                return;
+            }
+        }
+        throw new RuntimeException("The type of instance is: "
+                + instance.getClass() + ", which is NOT registered.");
     }
-    throw new RuntimeException("The type of instance is: "
-                               + instance.getClass() + ", which is NOT registered.");
-  }
 
-  /**
-   * Return the wrapped instance.
-   */
-  public Writable get() {
-    return instance;
-  }
-  
-  public String toString() {
-    return "GW[" + (instance != null ? ("class=" + instance.getClass().getName() +
-        ",value=" + instance.toString()) : "(null)") + "]";
-  }
-
-  public void readFields(DataInput in) throws IOException {
-    type = in.readByte();
-    Class<? extends Writable> clazz = getTypes()[type & 0xff];
-    try {
-      instance = ReflectionUtils.newInstance(clazz, conf);
-    } catch (Exception e) {
-      e.printStackTrace();
-      throw new IOException("Cannot initialize the class: " + clazz);
+    /**
+     * Return the wrapped instance.
+     */
+    public Writable get() {
+        return instance;
     }
-    instance.readFields(in);
-  }
 
-  public void write(DataOutput out) throws IOException {
-    if (type == NOT_SET || instance == null)
-      throw new IOException("The GenericWritable has NOT been set correctly. type="
-                            + type + ", instance=" + instance);
-    out.writeByte(type);
-    instance.write(out);
-  }
+    public String toString() {
+        return "GW[" + (instance != null ? ("class=" + instance.getClass().getName() +
+                ",value=" + instance.toString()) : "(null)") + "]";
+    }
 
-  /**
-   * Return all classes that may be wrapped.  Subclasses should implement this
-   * to return a constant array of classes.
-   */
-  abstract protected Class<? extends Writable>[] getTypes();
+    public void readFields(DataInput in) throws IOException {
+        type = in.readByte();
+        Class<? extends Writable> clazz = getTypes()[type & 0xff];
+        try {
+            instance = ReflectionUtils.newInstance(clazz, conf);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("Cannot initialize the class: " + clazz);
+        }
+        instance.readFields(in);
+    }
 
-  public Configuration getConf() {
-    return conf;
-  }
+    public void write(DataOutput out) throws IOException {
+        if (type == NOT_SET || instance == null)
+            throw new IOException("The GenericWritable has NOT been set correctly. type="
+                    + type + ", instance=" + instance);
+        out.writeByte(type);
+        instance.write(out);
+    }
 
-  public void setConf(Configuration conf) {
-    this.conf = conf;
-  }
-  
+    /**
+     * Return all classes that may be wrapped.  Subclasses should implement this
+     * to return a constant array of classes.
+     */
+    abstract protected Class<? extends Writable>[] getTypes();
+
+    public Configuration getConf() {
+        return conf;
+    }
+
+    public void setConf(Configuration conf) {
+        this.conf = conf;
+    }
+
 }

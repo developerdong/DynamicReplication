@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,35 +30,35 @@ import org.eclipse.jface.wizard.WizardDialog;
  */
 
 public class NewLocationAction extends Action {
-  public NewLocationAction() {
-    setText("New Hadoop location...");
-    setImageDescriptor(ImageLibrary.get("server.view.action.location.new"));
-  }
+    public NewLocationAction() {
+        setText("New Hadoop location...");
+        setImageDescriptor(ImageLibrary.get("server.view.action.location.new"));
+    }
 
-  @Override
-  public void run() {
-    WizardDialog dialog = new WizardDialog(null, new Wizard() {
-      private HadoopLocationWizard page = new HadoopLocationWizard();
+    @Override
+    public void run() {
+        WizardDialog dialog = new WizardDialog(null, new Wizard() {
+            private HadoopLocationWizard page = new HadoopLocationWizard();
 
-      @Override
-      public void addPages() {
-        super.addPages();
-        setWindowTitle("New Hadoop location...");
-        addPage(page);
-      }
+            @Override
+            public void addPages() {
+                super.addPages();
+                setWindowTitle("New Hadoop location...");
+                addPage(page);
+            }
 
-      @Override
-      public boolean performFinish() {
-        page.performFinish();
-        return true;
-      }
+            @Override
+            public boolean performFinish() {
+                page.performFinish();
+                return true;
+            }
 
-    });
+        });
 
-    dialog.create();
-    dialog.setBlockOnOpen(true);
-    dialog.open();
+        dialog.create();
+        dialog.setBlockOnOpen(true);
+        dialog.open();
 
-    super.run();
-  }
+        super.run();
+    }
 }

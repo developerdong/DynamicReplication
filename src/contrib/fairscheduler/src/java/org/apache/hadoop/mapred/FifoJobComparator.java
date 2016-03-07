@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,18 +25,18 @@ import java.util.Comparator;
  * in the default scheduler in Hadoop.
  */
 public class FifoJobComparator implements Comparator<JobInProgress> {
-  public int compare(JobInProgress j1, JobInProgress j2) {
-    int res = j1.getPriority().compareTo(j2.getPriority());
-    if (res == 0) {
-      if (j1.getStartTime() < j2.getStartTime()) {
-        res = -1;
-      } else {
-        res = (j1.getStartTime() == j2.getStartTime() ? 0 : 1);
-      }
+    public int compare(JobInProgress j1, JobInProgress j2) {
+        int res = j1.getPriority().compareTo(j2.getPriority());
+        if (res == 0) {
+            if (j1.getStartTime() < j2.getStartTime()) {
+                res = -1;
+            } else {
+                res = (j1.getStartTime() == j2.getStartTime() ? 0 : 1);
+            }
+        }
+        if (res == 0) {
+            res = j1.hashCode() - j2.hashCode();
+        }
+        return res;
     }
-    if (res == 0) {
-      res = j1.hashCode() - j2.hashCode();
-    }
-    return res;
-  }
 }

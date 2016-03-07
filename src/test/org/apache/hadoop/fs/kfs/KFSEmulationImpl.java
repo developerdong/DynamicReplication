@@ -1,11 +1,10 @@
 /**
- *
  * Licensed under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
@@ -13,7 +12,7 @@
  * permissions and limitations under the License.
  *
  * @author: Sriram Rao (Kosmix Corp.)
- * 
+ * <p>
  * We need to provide the ability to the code in fs/kfs without really
  * having a KFS deployment.  For this purpose, use the LocalFileSystem
  * as a way to "emulate" KFS.
@@ -36,7 +35,7 @@ import org.apache.hadoop.fs.BlockLocation;
 
 public class KFSEmulationImpl implements IFSImpl {
     FileSystem localFS;
-    
+
     public KFSEmulationImpl(Configuration conf) throws IOException {
         localFS = FileSystem.getLocal(conf);
     }
@@ -44,9 +43,11 @@ public class KFSEmulationImpl implements IFSImpl {
     public boolean exists(String path) throws IOException {
         return localFS.exists(new Path(path));
     }
+
     public boolean isDirectory(String path) throws IOException {
         return localFS.isDirectory(new Path(path));
     }
+
     public boolean isFile(String path) throws IOException {
         return localFS.isFile(new Path(path));
     }
@@ -101,27 +102,30 @@ public class KFSEmulationImpl implements IFSImpl {
     public long filesize(String path) throws IOException {
         return localFS.getLength(new Path(path));
     }
+
     public short getReplication(String path) throws IOException {
         return 1;
     }
+
     public short setReplication(String path, short replication) throws IOException {
         return 1;
     }
+
     public String[][] getDataLocation(String path, long start, long len) throws IOException {
-        BlockLocation[] blkLocations = 
-          localFS.getFileBlockLocations(localFS.getFileStatus(new Path(path)),
-              start, len);
-          if ((blkLocations == null) || (blkLocations.length == 0)) {
-            return new String[0][];     
-          }
-          int blkCount = blkLocations.length;
-          String[][]hints = new String[blkCount][];
-          for (int i=0; i < blkCount ; i++) {
+        BlockLocation[] blkLocations =
+                localFS.getFileBlockLocations(localFS.getFileStatus(new Path(path)),
+                        start, len);
+        if ((blkLocations == null) || (blkLocations.length == 0)) {
+            return new String[0][];
+        }
+        int blkCount = blkLocations.length;
+        String[][] hints = new String[blkCount][];
+        for (int i = 0; i < blkCount; i++) {
             String[] hosts = blkLocations[i].getHosts();
             hints[i] = new String[hosts.length];
             hints[i] = hosts;
-          }
-          return hints;
+        }
+        return hints;
     }
 
     public long getModificationTime(String path) throws IOException {
@@ -142,5 +146,5 @@ public class KFSEmulationImpl implements IFSImpl {
         return localFS.open(new Path(path));
     }
 
-    
+
 };

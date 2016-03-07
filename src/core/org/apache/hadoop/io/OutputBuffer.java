@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,51 +42,63 @@ import java.io.*;
  */
 public class OutputBuffer extends FilterOutputStream {
 
-  private static class Buffer extends ByteArrayOutputStream {
-    public byte[] getData() { return buf; }
-    public int getLength() { return count; }
-    public void reset() { count = 0; }
+    private static class Buffer extends ByteArrayOutputStream {
+        public byte[] getData() {
+            return buf;
+        }
 
-    public void write(InputStream in, int len) throws IOException {
-      int newcount = count + len;
-      if (newcount > buf.length) {
-        byte newbuf[] = new byte[Math.max(buf.length << 1, newcount)];
-        System.arraycopy(buf, 0, newbuf, 0, count);
-        buf = newbuf;
-      }
-      IOUtils.readFully(in, buf, count, len);
-      count = newcount;
+        public int getLength() {
+            return count;
+        }
+
+        public void reset() {
+            count = 0;
+        }
+
+        public void write(InputStream in, int len) throws IOException {
+            int newcount = count + len;
+            if (newcount > buf.length) {
+                byte newbuf[] = new byte[Math.max(buf.length << 1, newcount)];
+                System.arraycopy(buf, 0, newbuf, 0, count);
+                buf = newbuf;
+            }
+            IOUtils.readFully(in, buf, count, len);
+            count = newcount;
+        }
     }
-  }
 
-  private Buffer buffer;
-  
-  /** Constructs a new empty buffer. */
-  public OutputBuffer() {
-    this(new Buffer());
-  }
-  
-  private OutputBuffer(Buffer buffer) {
-    super(buffer);
-    this.buffer = buffer;
-  }
+    private Buffer buffer;
 
-  /** Returns the current contents of the buffer.
-   *  Data is only valid to {@link #getLength()}.
-   */
-  public byte[] getData() { return buffer.getData(); }
+    /** Constructs a new empty buffer. */
+    public OutputBuffer() {
+        this(new Buffer());
+    }
 
-  /** Returns the length of the valid data currently in the buffer. */
-  public int getLength() { return buffer.getLength(); }
+    private OutputBuffer(Buffer buffer) {
+        super(buffer);
+        this.buffer = buffer;
+    }
 
-  /** Resets the buffer to empty. */
-  public OutputBuffer reset() {
-    buffer.reset();
-    return this;
-  }
+    /** Returns the current contents of the buffer.
+     *  Data is only valid to {@link #getLength()}.
+     */
+    public byte[] getData() {
+        return buffer.getData();
+    }
 
-  /** Writes bytes from a InputStream directly into the buffer. */
-  public void write(InputStream in, int length) throws IOException {
-    buffer.write(in, length);
-  }
+    /** Returns the length of the valid data currently in the buffer. */
+    public int getLength() {
+        return buffer.getLength();
+    }
+
+    /** Resets the buffer to empty. */
+    public OutputBuffer reset() {
+        buffer.reset();
+        return this;
+    }
+
+    /** Writes bytes from a InputStream directly into the buffer. */
+    public void write(InputStream in, int length) throws IOException {
+        buffer.write(in, length);
+    }
 }

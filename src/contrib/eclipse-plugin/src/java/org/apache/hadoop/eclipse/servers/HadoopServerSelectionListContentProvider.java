@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,46 +31,46 @@ import org.eclipse.swt.graphics.Image;
  */
 
 public class HadoopServerSelectionListContentProvider implements
-    IContentProvider, ITableLabelProvider, IStructuredContentProvider {
-  public void dispose() {
+        IContentProvider, ITableLabelProvider, IStructuredContentProvider {
+    public void dispose() {
 
-  }
-
-  public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
-
-  }
-
-  public Image getColumnImage(Object element, int columnIndex) {
-    return null;
-  }
-
-  public String getColumnText(Object element, int columnIndex) {
-    if (element instanceof HadoopServer) {
-      HadoopServer location = (HadoopServer) element;
-      if (columnIndex == 0) {
-        return location.getLocationName();
-
-      } else if (columnIndex == 1) {
-        return location.getMasterHostName();
-      }
     }
 
-    return element.toString();
-  }
+    public void inputChanged(Viewer viewer, Object oldInput, Object newInput) {
 
-  public void addListener(ILabelProviderListener listener) {
+    }
 
-  }
+    public Image getColumnImage(Object element, int columnIndex) {
+        return null;
+    }
 
-  public boolean isLabelProperty(Object element, String property) {
-    return false;
-  }
+    public String getColumnText(Object element, int columnIndex) {
+        if (element instanceof HadoopServer) {
+            HadoopServer location = (HadoopServer) element;
+            if (columnIndex == 0) {
+                return location.getLocationName();
 
-  public void removeListener(ILabelProviderListener listener) {
+            } else if (columnIndex == 1) {
+                return location.getMasterHostName();
+            }
+        }
 
-  }
+        return element.toString();
+    }
 
-  public Object[] getElements(Object inputElement) {
-    return ServerRegistry.getInstance().getServers().toArray();
-  }
+    public void addListener(ILabelProviderListener listener) {
+
+    }
+
+    public boolean isLabelProperty(Object element, String property) {
+        return false;
+    }
+
+    public void removeListener(ILabelProviderListener listener) {
+
+    }
+
+    public Object[] getElements(Object inputElement) {
+        return ServerRegistry.getInstance().getServers().toArray();
+    }
 }

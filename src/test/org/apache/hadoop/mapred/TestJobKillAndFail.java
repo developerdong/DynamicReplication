@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,31 +31,31 @@ import org.apache.hadoop.fs.Path;
  */
 public class TestJobKillAndFail extends TestCase {
 
-  private static String TEST_ROOT_DIR = new File(System.getProperty(
-      "test.build.data", "/tmp")).toURI().toString().replace(' ', '+');
+    private static String TEST_ROOT_DIR = new File(System.getProperty(
+            "test.build.data", "/tmp")).toURI().toString().replace(' ', '+');
 
-  public void testJobFailAndKill() throws IOException {
-    MiniMRCluster mr = null;
-    try {
-      mr = new MiniMRCluster(2, "file:///", 3);
+    public void testJobFailAndKill() throws IOException {
+        MiniMRCluster mr = null;
+        try {
+            mr = new MiniMRCluster(2, "file:///", 3);
 
-      // run the TCs
-      JobConf conf = mr.createJobConf();
+            // run the TCs
+            JobConf conf = mr.createJobConf();
 
-      Path inDir = new Path(TEST_ROOT_DIR + "/failkilljob/input");
-      Path outDir = new Path(TEST_ROOT_DIR + "/failkilljob/output");
-      RunningJob job = UtilsForTests.runJobFail(conf, inDir, outDir);
-      // Checking that the Job got failed
-      assertEquals(job.getJobState(), JobStatus.FAILED);
+            Path inDir = new Path(TEST_ROOT_DIR + "/failkilljob/input");
+            Path outDir = new Path(TEST_ROOT_DIR + "/failkilljob/output");
+            RunningJob job = UtilsForTests.runJobFail(conf, inDir, outDir);
+            // Checking that the Job got failed
+            assertEquals(job.getJobState(), JobStatus.FAILED);
 
-      job = UtilsForTests.runJobKill(conf, inDir, outDir);
-      // Checking that the Job got killed
-      assertTrue(job.isComplete());
-      assertEquals(job.getJobState(), JobStatus.KILLED);
-    } finally {
-      if (mr != null) {
-        mr.shutdown();
-      }
+            job = UtilsForTests.runJobKill(conf, inDir, outDir);
+            // Checking that the Job got killed
+            assertTrue(job.isComplete());
+            assertEquals(job.getJobState(), JobStatus.KILLED);
+        } finally {
+            if (mr != null) {
+                mr.shutdown();
+            }
+        }
     }
-  }
 }

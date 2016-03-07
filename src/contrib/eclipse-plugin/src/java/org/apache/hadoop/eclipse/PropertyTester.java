@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,20 +24,20 @@ import java.util.logging.Logger;
  * Class to help with debugging properties
  */
 public class PropertyTester extends
-    org.eclipse.core.expressions.PropertyTester {
+        org.eclipse.core.expressions.PropertyTester {
 
-  static Logger log = Logger.getLogger(PropertyTester.class.getName());
+    static Logger log = Logger.getLogger(PropertyTester.class.getName());
 
-  public PropertyTester() {
-  }
+    public PropertyTester() {
+    }
 
-  public boolean test(Object receiver, String property, Object[] args,
-      Object expectedValue) {
-    log.fine("Test property " + property + ", " + receiver.getClass());
+    public boolean test(Object receiver, String property, Object[] args,
+                        Object expectedValue) {
+        log.fine("Test property " + property + ", " + receiver.getClass());
 
-    return true;
+        return true;
 
-    // todo(jz) support test for deployable if module has hadoop nature etc.
-  }
+        // todo(jz) support test for deployable if module has hadoop nature etc.
+    }
 
 }

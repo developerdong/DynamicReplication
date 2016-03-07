@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,6 +20,7 @@ package org.apache.hadoop.vaidya;
 import org.apache.hadoop.vaidya.util.XMLUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -33,53 +34,53 @@ import javax.xml.parsers.ParserConfigurationException;
  */
 public class JobDiagnoser {
 
-  /*
-   * XML document containing report elements, one for each rule tested
-   */
-  private Document _report;
+    /*
+     * XML document containing report elements, one for each rule tested
+     */
+    private Document _report;
 
-  /*
-   * @report : returns report document
-   */
-  public Document getReport() {
-    return this._report;
-  }
-  
+    /*
+     * @report : returns report document
+     */
+    public Document getReport() {
+        return this._report;
+    }
 
-  /**
-   * Constructor. It initializes the report document.
-   */
-  public JobDiagnoser () throws Exception {
+
+    /**
+     * Constructor. It initializes the report document.
+     */
+    public JobDiagnoser() throws Exception {
     
     /*
      * Initialize the report document, make it ready to add the child report elements 
      */
-    DocumentBuilder builder = null;
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    try{
-      builder = factory.newDocumentBuilder();
-      this._report = builder.newDocument();
-    } catch (ParserConfigurationException e) {
-      e.printStackTrace();
+        DocumentBuilder builder = null;
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        try {
+            builder = factory.newDocumentBuilder();
+            this._report = builder.newDocument();
+        } catch (ParserConfigurationException e) {
+            e.printStackTrace();
+        }
+
+        // Insert Root Element
+        Element root = (Element) this._report.createElement("PostExPerformanceDiagnosticReport");
+        this._report.appendChild(root);
     }
-      
-    // Insert Root Element
-    Element root = (Element) this._report.createElement("PostExPerformanceDiagnosticReport");
-    this._report.appendChild(root);
-  }
-  
-  /*
-   * Print the report document to console
-   */
-  public void printReport() {
-    XMLUtils.printDOM(this._report);
-  }
-  
-  /*
-   * Save the report document the specified report file
-   * @param reportfile : path of report file. 
-   */
-  public void saveReport(String filename) {
-    XMLUtils.writeXmlToFile(filename, this._report);
-  }
+
+    /*
+     * Print the report document to console
+     */
+    public void printReport() {
+        XMLUtils.printDOM(this._report);
+    }
+
+    /*
+     * Save the report document the specified report file
+     * @param reportfile : path of report file.
+     */
+    public void saveReport(String filename) {
+        XMLUtils.writeXmlToFile(filename, this._report);
+    }
 }

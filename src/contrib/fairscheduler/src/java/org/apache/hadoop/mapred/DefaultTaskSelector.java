@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,48 +29,48 @@ import java.io.IOException;
  */
 public class DefaultTaskSelector extends TaskSelector {
 
-  @Override
-  public int neededSpeculativeMaps(JobInProgress job) {
-    int count = 0;
-    long time = System.currentTimeMillis();
-    double avgProgress = job.getStatus().mapProgress();
-    for (TaskInProgress tip: job.maps) {
-      if (tip.isRunning() && tip.hasSpeculativeTask(time, avgProgress)) {
-        count++;
-      }
+    @Override
+    public int neededSpeculativeMaps(JobInProgress job) {
+        int count = 0;
+        long time = System.currentTimeMillis();
+        double avgProgress = job.getStatus().mapProgress();
+        for (TaskInProgress tip : job.maps) {
+            if (tip.isRunning() && tip.hasSpeculativeTask(time, avgProgress)) {
+                count++;
+            }
+        }
+        return count;
     }
-    return count;
-  }
 
-  @Override
-  public int neededSpeculativeReduces(JobInProgress job) {
-    int count = 0;
-    long time = System.currentTimeMillis();
-    double avgProgress = job.getStatus().reduceProgress();
-    for (TaskInProgress tip: job.reduces) {
-      if (tip.isRunning() && tip.hasSpeculativeTask(time, avgProgress)) {
-        count++;
-      }
+    @Override
+    public int neededSpeculativeReduces(JobInProgress job) {
+        int count = 0;
+        long time = System.currentTimeMillis();
+        double avgProgress = job.getStatus().reduceProgress();
+        for (TaskInProgress tip : job.reduces) {
+            if (tip.isRunning() && tip.hasSpeculativeTask(time, avgProgress)) {
+                count++;
+            }
+        }
+        return count;
     }
-    return count;
-  }
 
-  @Override
-  public Task obtainNewMapTask(TaskTrackerStatus taskTracker, JobInProgress job)
-      throws IOException {
-    ClusterStatus clusterStatus = taskTrackerManager.getClusterStatus();
-    int numTaskTrackers = clusterStatus.getTaskTrackers();
-    return job.obtainNewMapTask(taskTracker, numTaskTrackers,
-        taskTrackerManager.getNumberOfUniqueHosts());
-  }
+    @Override
+    public Task obtainNewMapTask(TaskTrackerStatus taskTracker, JobInProgress job)
+            throws IOException {
+        ClusterStatus clusterStatus = taskTrackerManager.getClusterStatus();
+        int numTaskTrackers = clusterStatus.getTaskTrackers();
+        return job.obtainNewMapTask(taskTracker, numTaskTrackers,
+                taskTrackerManager.getNumberOfUniqueHosts());
+    }
 
-  @Override
-  public Task obtainNewReduceTask(TaskTrackerStatus taskTracker, JobInProgress job)
-      throws IOException {
-    ClusterStatus clusterStatus = taskTrackerManager.getClusterStatus();
-    int numTaskTrackers = clusterStatus.getTaskTrackers();
-    return job.obtainNewReduceTask(taskTracker, numTaskTrackers,
-        taskTrackerManager.getNumberOfUniqueHosts());
-  }
+    @Override
+    public Task obtainNewReduceTask(TaskTrackerStatus taskTracker, JobInProgress job)
+            throws IOException {
+        ClusterStatus clusterStatus = taskTrackerManager.getClusterStatus();
+        int numTaskTrackers = clusterStatus.getTaskTrackers();
+        return job.obtainNewReduceTask(taskTracker, numTaskTrackers,
+                taskTrackerManager.getNumberOfUniqueHosts());
+    }
 
 }

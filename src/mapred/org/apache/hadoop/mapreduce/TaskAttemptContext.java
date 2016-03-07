@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,40 +27,40 @@ import org.apache.hadoop.util.Progressable;
  * The context for task attempts.
  */
 public class TaskAttemptContext extends JobContext implements Progressable {
-  private final TaskAttemptID taskId;
-  private String status = "";
-  
-  public TaskAttemptContext(Configuration conf, 
-                            TaskAttemptID taskId) {
-    super(conf, taskId.getJobID());
-    this.taskId = taskId;
-  }
+    private final TaskAttemptID taskId;
+    private String status = "";
 
-  /**
-   * Get the unique name for this task attempt.
-   */
-  public TaskAttemptID getTaskAttemptID() {
-    return taskId;
-  }
+    public TaskAttemptContext(Configuration conf,
+                              TaskAttemptID taskId) {
+        super(conf, taskId.getJobID());
+        this.taskId = taskId;
+    }
 
-  /**
-   * Set the current status of the task to the given string.
-   */
-  public void setStatus(String msg) throws IOException {
-    status = msg;
-  }
+    /**
+     * Get the unique name for this task attempt.
+     */
+    public TaskAttemptID getTaskAttemptID() {
+        return taskId;
+    }
 
-  /**
-   * Get the last set status message.
-   * @return the current status message
-   */
-  public String getStatus() {
-    return status;
-  }
+    /**
+     * Set the current status of the task to the given string.
+     */
+    public void setStatus(String msg) throws IOException {
+        status = msg;
+    }
 
-  /**
-   * Report progress. The subtypes actually do work in this method.
-   */
-  public void progress() { 
-  }
+    /**
+     * Get the last set status message.
+     * @return the current status message
+     */
+    public String getStatus() {
+        return status;
+    }
+
+    /**
+     * Report progress. The subtypes actually do work in this method.
+     */
+    public void progress() {
+    }
 }
