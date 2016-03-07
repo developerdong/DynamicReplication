@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ * <p/>
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -4385,17 +4385,18 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             int srcReplication = inode.getReplication();
             long srcAccessTime = inode.getAccessTime();
 
-            //如果是最小文件则更新最小文件
-            if(minAccessTimeFile.get(srcReplication).equals(src)) {
-                updateMinAccessTimeFileOfSet(srcReplication);
-            }
 
             if(insertFileIntoNewSet(src, srcReplication, srcAccessTime)){
                 //插入成功且副本数不是最小副本数则在原集合中删除
                 if(srcReplication > minDynamicReplication) {
                     replicationSets.get(srcReplication).remove(src);
+                    //如果是最小文件则更新最小文件
+                    if(minAccessTimeFile.get(srcReplication).equals(src)) {
+                        updateMinAccessTimeFileOfSet(srcReplication);
+                    }
                 }
             }
+
 
 
             //对空间是否达到上限进行判断处理
