@@ -284,6 +284,25 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     // precision of access times.
     private long accessTimePrecision = 0;
 
+    //指数平均法中灵敏度alpha
+    private float alpha;
+
+    //最大动态副本
+    private int maxDynamicReplication;
+
+    //最小动态副本
+    private int minDynamicReplication;
+
+    //存储空间使用上限
+    private float capacityUsedPercentTop;
+
+    //动态副本类
+    private DynamicReplicationMonitor dynamicReplicationMonitor;
+
+    //执行副本分配算法
+    public void allocateReplication(String src,INodeFile inode) throws IOException {
+        this.dynamicReplicationMonitor.allocateReplication(src, inode);
+    }
     /**
      * FSNamesystem constructor.
      */
@@ -303,6 +322,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     private void initialize(NameNode nn, Configuration conf) throws IOException {
         this.systemStart = now();
         setConfigurationParameters(conf);
+
+        this.dynamicReplicationMonitor = new DynamicReplicationMonitor(maxDynamicReplication, minDynamicReplication, capacityUsedPercentTop);
 
         this.nameNodeAddress = nn.getNameNodeAddress();
         this.registerMBean(conf); // register the MBean for the FSNamesystemStutus
@@ -405,7 +426,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 conf.getBoolean("dfs.replication.considerLoad", true),
                 this,
                 clusterMap);
-        this.defaultReplication = conf.getInt("dfs.replication", 3);
+
+        this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
+        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 0.8f);
+        this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
+        this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
+        //this.defaultReplication = conf.getInt("dfs.replication", 3);
+        this.defaultReplication = this.minDynamicReplication;
         this.maxReplication = conf.getInt("dfs.replication.max", 512);
         this.minReplication = conf.getInt("dfs.replication.min", 1);
         if (minReplication <= 0)
@@ -435,7 +462,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         this.maxFsObjects = conf.getLong("dfs.max.objects", 0);
         this.blockInvalidateLimit = Math.max(this.blockInvalidateLimit,
                 20 * (int) (heartbeatInterval / 1000));
-        this.accessTimePrecision = conf.getLong("dfs.access.time.precision", 0);
+        this.accessTimePrecision = conf.getLong("dfs.access.time.precision", 60000);
         this.supportAppends = conf.getBoolean("dfs.support.append", false);
     }
 
@@ -564,7 +591,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     long getAccessTimePrecision() {
         return accessTimePrecision;
     }
-
+    float getAlpha(){
+        return alpha;
+    }
     private boolean isAccessTimeSupported() {
         return accessTimePrecision > 0;
     }
@@ -1475,7 +1504,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
     /**
      * Remove a datanode from the invalidatesSet
-     * @param n datanode
      */
     void removeFromInvalidates(String storageID) {
         Collection<Block> blocks = recentInvalidateSets.remove(storageID);
@@ -4310,6 +4338,142 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 throw new RuntimeException(msg, es);
             }
             smmthread = null;
+        }
+    }
+
+    class DynamicReplicationMonitor {
+        //动态副本调整的最大值
+        int maxDynamicReplication;
+        //动态副本调整的最小值
+        int minDynamicReplication;
+        //动态副本调整空间上限，达到这个值应该减少副本数
+        float capacityUsedPercentTop;
+        //保存不同优先级的集合，最高优先级集合中文件副本数为dynamicMax，最低优先级集合中文件副本数为dynamicMin+1
+        Hashtable<Integer,ArrayList<String>> replicationSets;
+        //保存每个集合中指数平均访问时间最小的文件
+        Hashtable<Integer,String> minAccessTimeFile;
+        //比较器用来比较两个文件之间指数平均访问时间的大小
+        Comparator<String> accessTimeComparator = new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2){
+                return (int)(dir.getFileINode(o1).getAccessTime()-dir.getFileINode(o2).getAccessTime());
+            }
+        };
+        DynamicReplicationMonitor(){
+            this.initialize(6,3,0.8f);
+        }
+        DynamicReplicationMonitor(int maxDynamicReplication, int minDynamicReplication, float capacityUsedPercentTop){
+            this.initialize(maxDynamicReplication, minDynamicReplication,capacityUsedPercentTop);
+        }
+        void initialize(int maxDynamicReplication,int minDynamicReplication,float capacityUsedPercentTop){
+            this.maxDynamicReplication = maxDynamicReplication;
+            this.minDynamicReplication = minDynamicReplication;
+            this.capacityUsedPercentTop = capacityUsedPercentTop;
+            this.replicationSets = new Hashtable<Integer, ArrayList<String>>();
+            for(int i = minDynamicReplication+1;i <= maxDynamicReplication;i++){
+                replicationSets.put(i,new ArrayList<String>());
+            }
+            this.minAccessTimeFile = new Hashtable<Integer, String>();
+
+        }
+
+        /**
+         * 更新被访问文件的副本数
+         */
+        void allocateReplication(String src, INodeFile inode) throws IOException{
+            //获取文件信息
+            int srcReplication = inode.getReplication();
+            long srcAccessTime = inode.getAccessTime();
+
+            //如果是最小文件则更新最小文件
+            if(minAccessTimeFile.get(srcReplication).equals(src)) {
+                updateMinAccessTimeFileOfSet(srcReplication);
+            }
+
+            if(insertFileIntoNewSet(src, srcReplication, srcAccessTime)){
+                //插入成功且副本数不是最小副本数则在原集合中删除
+                if(srcReplication > minDynamicReplication) {
+                    replicationSets.get(srcReplication).remove(src);
+                }
+            }
+
+
+            //对空间是否达到上限进行判断处理
+            if( (1 - getCapacityRemainingPercent()) > capacityUsedPercentTop){
+                //从低副本集合向高副本集合扫描
+                for(int rep = minDynamicReplication +1; rep <= maxDynamicReplication; rep++){
+                    //获得文件集合，集合中每个文件副本数为rep
+                    ArrayList<String> replicationSet = replicationSets.get(rep);
+                    //对集合进行排序，选取accessTime最小的那一半文件
+                    replicationSet.sort(accessTimeComparator);
+                    ArrayList<String> halfReplicationSet = (ArrayList<String>) replicationSet.subList(0,replicationSet.size()/2);
+                    //这一半文件的副本数都减一
+                    for(String file : halfReplicationSet){
+                        setReplicationInternal(file,(short)(rep - 1));
+                    }
+                    //从原集合移除这一半文件
+                    replicationSet.removeAll(halfReplicationSet);
+                    //更新rep文件集合中最小accessTimeFile
+                    updateMinAccessTimeFileOfSet(rep);
+                    //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
+                    if(rep > minDynamicReplication +1){
+                        replicationSets.get(rep-1).addAll(halfReplicationSet);
+                    }
+                }
+            }
+        }
+        /**
+         * 尝试将文件插入新集合，成功插入则返回true，accessTime太小不满足插入条件就返回false
+         */
+        private boolean insertFileIntoNewSet(String src, int srcReplication, long srcAccessTime) throws IOException{
+            //遍历比srcReplication副本数大的集合，尝试插入
+            for(int rep = srcReplication+1; rep <= maxDynamicReplication; rep++){
+                ArrayList<String> replicationSet = replicationSets.get(rep);
+                //集合为空或者访问时间大于集合中最小访问时间就进行插入
+                if(replicationSet.isEmpty()){
+                    //插入新集合
+                    replicationSet.add(src);
+                    //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
+                    minAccessTimeFile.put(rep, src);
+                    /*这里使用internal方法的原因是internal方法不记录EditLog，
+                    * 假如NameNode崩溃，重新启动时各个文件的副本数会重新设置为3，
+                    * 而动态副本类中的文件集合会重新初始化，两者正好相适应，
+                    * 如果记录了EditLog，各个文件的副本数有高有低，但是动态副本类中
+                    * 集合并没有相应的记录会出问题，后果包括如果文件不被访问，
+                    * 文件的副本数永远不会减少*/
+                    setReplicationInternal(src,(short)rep);
+                    return true;
+                }
+                else if(srcAccessTime > dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
+                    replicationSet.add(src);
+                    setReplicationInternal(src,(short)rep);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * 更新rep对应集合中accessTime最小的文件
+         */
+        private boolean updateMinAccessTimeFileOfSet(int rep){
+            //先保存最初的最小文件
+            String oldFile = minAccessTimeFile.get(rep);
+            String newFile = "";
+            //先把minAccessTime设为最大值
+            long minAccessTime = Long.MAX_VALUE;
+            //遍历集合，寻找是否有更小的元素
+            for(String file:replicationSets.get(rep)){
+
+                if(dir.getFileInfo(file).getAccessTime() < minAccessTime){
+                    newFile = file;
+                }
+            }
+            if(!newFile.equals(oldFile)){
+                minAccessTimeFile.put(rep, newFile);
+                return true;
+            }
+            return false;
         }
     }
 

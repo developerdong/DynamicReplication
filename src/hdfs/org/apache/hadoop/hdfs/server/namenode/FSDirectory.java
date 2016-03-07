@@ -1322,7 +1322,18 @@ class FSDirectory implements FSConstants, Closeable {
             if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
                 status = false;
             } else {
-                inode.setAccessTime(atime);
+                //使用指数平均法来计算平均访问时间
+                long newAccessTime;
+                float alpha = namesystem.getAlpha();
+                if(inodeTime <= 0){
+                    newAccessTime = atime;
+                }
+                else{
+                    newAccessTime = (long)(inodeTime * (1 - alpha) + atime * alpha);
+                }
+                inode.setAccessTime(newAccessTime);
+                //尝试执行副本更新算法
+                namesystem.allocateReplication(src, inode);
                 status = true;
             }
         }
