@@ -4466,7 +4466,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
                 NameNode.allocationLog.info("begin to scan set " + rep);
                 ArrayList<String> replicationSet = replicationSets.get(rep);
-                //集合为空或者访问时间大于集合中最小访问时间就进行插入
+                //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
                     //插入新集合
                     replicationSet.add(src);
@@ -4483,7 +4483,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     setReplicationInternalWithoutPermissionCheck(src,(short)rep);
                     return true;
                 }
-                else if(srcAccessTime > dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
+                else if(srcAccessTime >= dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
                     replicationSet.add(src);
                     NameNode.allocationLog.info(src + " was inserted into set " + rep);
                     setReplicationInternalWithoutPermissionCheck(src,(short)rep);
