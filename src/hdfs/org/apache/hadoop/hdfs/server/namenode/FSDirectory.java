@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.permission.*;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.metrics.MetricsRecord;
 import org.apache.hadoop.metrics.MetricsUtil;
 import org.apache.hadoop.metrics.MetricsContext;
@@ -603,7 +604,6 @@ class FSDirectory implements FSConstants, Closeable {
      * Update the count at each ancestor directory with quota
      * @param src a string representation of a path to an inode
      * @param modificationTime the time the inode is removed
-     * @param deletedBlocks the place holder for the blocks to be removed
      * @return if the deletion succeeds
      */
     INode unprotectedDelete(String src, long modificationTime) {
@@ -824,7 +824,7 @@ class FSDirectory implements FSConstants, Closeable {
      * @param nsDelta the delta change of namespace
      * @param dsDelta the delta change of diskspace
      * @throws QuotaExceededException if the new count violates any quota limit
-     * @throws FileNotFound if path does not exist.
+     * @throws FileNotFoundException if path does not exist.
      */
     void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
             throws QuotaExceededException,
@@ -1158,7 +1158,6 @@ class FSDirectory implements FSConstants, Closeable {
      * with fixing the state, if there is a problem.
      *
      * @param dir the root of the tree that represents the directory
-     * @param counters counters for name space and disk space
      * @param nodesInPath INodes for the each of components in the path.
      * @return the size of the tree
      */
@@ -1319,9 +1318,11 @@ class FSDirectory implements FSConstants, Closeable {
 
             // if the last access time update was within the last precision interval, then
             // no need to store access time
-            if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
+            //if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
+            if (atime <= inodeTime + 10000 && !force) {
                 status = false;
             } else {
+                NameNode.allocationLog.info("begin to update access time");
                 //使用指数平均法来计算平均访问时间
                 long newAccessTime;
                 float alpha = namesystem.getAlpha();
@@ -1333,7 +1334,10 @@ class FSDirectory implements FSConstants, Closeable {
                 }
                 inode.setAccessTime(newAccessTime);
                 //尝试执行副本更新算法
+                NameNode.allocationLog.info("end update access time");
+                NameNode.allocationLog.info("begin update replication");
                 namesystem.allocateReplication(src, inode);
+                NameNode.allocationLog.info("end update replication");
                 status = true;
             }
         }

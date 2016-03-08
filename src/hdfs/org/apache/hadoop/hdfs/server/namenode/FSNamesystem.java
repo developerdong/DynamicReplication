@@ -430,9 +430,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
         this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 0.8f);
         this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
-        this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
-        //this.defaultReplication = conf.getInt("dfs.replication", 3);
-        this.defaultReplication = this.minDynamicReplication;
+        //this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
+        this.defaultReplication = conf.getInt("dfs.replication", 3);
+        this.minDynamicReplication = this.defaultReplication;
         this.maxReplication = conf.getInt("dfs.replication.max", 512);
         this.minReplication = conf.getInt("dfs.replication.min", 1);
         if (minReplication <= 0)
@@ -4442,7 +4442,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     ArrayList<String> replicationSet = replicationSets.get(rep);
                     //对集合进行排序，选取accessTime最小的那一半文件
                     replicationSet.sort(accessTimeComparator);
-                    ArrayList<String> halfReplicationSet = (ArrayList<String>) replicationSet.subList(0,replicationSet.size()/2);
+                    ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
                     //这一半文件的副本数都减一
                     for(String file : halfReplicationSet){
                         setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
@@ -4464,6 +4464,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         private boolean insertFileIntoNewSet(String src, int srcReplication, long srcAccessTime) throws IOException{
             //遍历比srcReplication副本数大的集合，尝试插入
             for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
+                NameNode.allocationLog.info("begin to scan set " + rep);
                 ArrayList<String> replicationSet = replicationSets.get(rep);
                 //集合为空或者访问时间大于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
