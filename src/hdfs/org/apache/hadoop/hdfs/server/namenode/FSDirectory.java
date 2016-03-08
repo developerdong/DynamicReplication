@@ -1322,22 +1322,26 @@ class FSDirectory implements FSConstants, Closeable {
             if (atime <= inodeTime + 10000 && !force) {
                 status = false;
             } else {
-                NameNode.allocationLog.info("begin to update access time");
+                NameNode.allocationLog.info("begin to update access time of file " + src);
                 //使用指数平均法来计算平均访问时间
                 long newAccessTime;
                 float alpha = namesystem.getAlpha();
-                if(inodeTime <= 0){
-                    newAccessTime = atime;
+                //如果atime更小，即第一次访问，则访问时间不变
+                if(atime <= inodeTime){
+                    newAccessTime = inodeTime;
                 }
                 else{
                     newAccessTime = (long)(inodeTime * (1 - alpha) + atime * alpha);
                 }
+                NameNode.allocationLog.info("old access time of file is " + inodeTime);
+                NameNode.allocationLog.info("new access time of file is " + newAccessTime);
                 inode.setAccessTime(newAccessTime);
+                NameNode.allocationLog.info("end update access time of file " + src);
+
                 //尝试执行副本更新算法
-                NameNode.allocationLog.info("end update access time");
-                NameNode.allocationLog.info("begin update replication");
+                NameNode.allocationLog.info("begin update replication of file " + src);
                 namesystem.allocateReplication(src, inode);
-                NameNode.allocationLog.info("end update replication");
+                NameNode.allocationLog.info("end update replication of file " + src);
                 status = true;
             }
         }
