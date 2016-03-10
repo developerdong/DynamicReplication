@@ -360,6 +360,7 @@ class ReplicationTargetChooser {
     private DatanodeDescriptor[] chooseLeast(int numOfReplicas,
                                              String nodes,
                                              List<Node> excludedNodes) {
+        NameNode.placementLog.info("begin to choose least");
         List<DatanodeDescriptor> results =
                 new ArrayList<DatanodeDescriptor>();
         List<DatanodeDescriptor> intermediateResults =
@@ -390,6 +391,7 @@ class ReplicationTargetChooser {
         intermediateResults.sort(comparator);
         results = intermediateResults.subList(0,numOfReplicas);
         excludedNodes.addAll(results);
+        NameNode.placementLog.info("end choose least");
         /*
         while (numOfReplicas > 0) {
             DatanodeDescriptor choosenNode =
