@@ -1328,6 +1328,7 @@ class FSDirectory implements FSConstants, Closeable {
                 float alpha = namesystem.getAlpha();
                 //如果atime更小，即第一次访问，则访问时间不变
                 if(atime <= inodeTime){
+                    NameNode.allocationLog.info("first time visit");
                     newAccessTime = inodeTime;
                 }
                 else{
