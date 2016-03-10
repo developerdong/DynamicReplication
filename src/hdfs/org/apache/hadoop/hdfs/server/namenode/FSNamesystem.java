@@ -1475,7 +1475,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
     /**
      * Remove a datanode from the invalidatesSet
-     * @param n datanode
      */
     void removeFromInvalidates(String storageID) {
         Collection<Block> blocks = recentInvalidateSets.remove(storageID);
@@ -1535,7 +1534,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         if (size == 0) {
             return;
         }
-        for (Map.Entry<String, Collection<Block>> entry : recentInvalidateSets.entrySet()) {
+         for (Map.Entry<String, Collection<Block>> entry : recentInvalidateSets.entrySet()) {
             Collection<Block> blocks = entry.getValue();
             if (blocks.size() > 0) {
                 out.println(datanodeMap.get(entry.getKey()).getName() + blocks);
@@ -2656,12 +2655,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 continue;
             }
             if (srcNode.isDecommissionInProgress())
-                continue;
-            // switch to a different node randomly
+                continue;//如果有DECOMMISSION_INPROGRESS状态的node被选中，则下面的负载比较就不会进行
+            // switch to a different node with lowest XceiverCount
             // this to prevent from deterministically selecting the same node even
             // if the node failed to replicate the block on previous iterations
-            if (r.nextBoolean())
+            if (node.getXceiverCount() < srcNode.getXceiverCount())
                 srcNode = node;
+            //当没有DECOMMISSION_INPROGRESS状态节点时，选择负载最低的节点
         }
         if (numReplicas != null)
             numReplicas.initialize(live, decommissioned, corrupt, excess);
