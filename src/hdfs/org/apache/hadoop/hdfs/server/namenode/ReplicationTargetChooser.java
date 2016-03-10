@@ -178,7 +178,7 @@ class ReplicationTargetChooser {
                         break;
                     }
                 default:
-                    chooseRandom(numOfReplicas, NodeBase.ROOT, excludedNodes,
+                    chooseLeast(numOfReplicas, NodeBase.ROOT, excludedNodes,
                             blocksize, maxNodesPerRack, results);
             }
         } catch (NotEnoughReplicasException e) {
@@ -202,7 +202,7 @@ class ReplicationTargetChooser {
             throws NotEnoughReplicasException {
         // if no local machine, randomly choose one node
         if (localMachine == null)
-            return chooseRandom(NodeBase.ROOT, excludedNodes,
+            return chooseLeast(NodeBase.ROOT, excludedNodes,
                     blocksize, maxNodesPerRack, results);
 
         // otherwise try local machine first
@@ -236,13 +236,13 @@ class ReplicationTargetChooser {
             throws NotEnoughReplicasException {
         // no local machine, so choose a random machine
         if (localMachine == null) {
-            return chooseRandom(NodeBase.ROOT, excludedNodes,
+            return chooseLeast(NodeBase.ROOT, excludedNodes,
                     blocksize, maxNodesPerRack, results);
         }
 
         // choose one from the local rack
         try {
-            return chooseRandom(
+            return chooseLeast(
                     localMachine.getNetworkLocation(),
                     excludedNodes, blocksize, maxNodesPerRack, results);
         } catch (NotEnoughReplicasException e1) {
@@ -258,17 +258,17 @@ class ReplicationTargetChooser {
             }
             if (newLocal != null) {
                 try {
-                    return chooseRandom(
+                    return chooseLeast(
                             newLocal.getNetworkLocation(),
                             excludedNodes, blocksize, maxNodesPerRack, results);
                 } catch (NotEnoughReplicasException e2) {
                     //otherwise randomly choose one from the network
-                    return chooseRandom(NodeBase.ROOT, excludedNodes,
+                    return chooseLeast(NodeBase.ROOT, excludedNodes,
                             blocksize, maxNodesPerRack, results);
                 }
             } else {
                 //otherwise randomly choose one from the network
-                return chooseRandom(NodeBase.ROOT, excludedNodes,
+                return chooseLeast(NodeBase.ROOT, excludedNodes,
                         blocksize, maxNodesPerRack, results);
             }
         }
@@ -290,10 +290,10 @@ class ReplicationTargetChooser {
         int oldNumOfReplicas = results.size();
         // randomly choose one node from remote racks
         try {
-            chooseRandom(numOfReplicas, "~" + localMachine.getNetworkLocation(),
+            chooseLeast(numOfReplicas, "~" + localMachine.getNetworkLocation(),
                     excludedNodes, blocksize, maxReplicasPerRack, results);
         } catch (NotEnoughReplicasException e) {
-            chooseRandom(numOfReplicas - (results.size() - oldNumOfReplicas),
+            chooseLeast(numOfReplicas - (results.size() - oldNumOfReplicas),
                     localMachine.getNetworkLocation(), excludedNodes, blocksize,
                     maxReplicasPerRack, results);
         }
@@ -302,7 +302,7 @@ class ReplicationTargetChooser {
     /* Randomly choose one target from <i>nodes</i>.
      * @return the choosen node
      */
-    private DatanodeDescriptor chooseRandom(
+    private DatanodeDescriptor chooseLeast(
             String nodes,
             List<Node> excludedNodes,
             long blocksize,
@@ -312,7 +312,7 @@ class ReplicationTargetChooser {
         DatanodeDescriptor result;
         do {
             DatanodeDescriptor[] selectedNodes =
-                    chooseRandom(1, nodes, excludedNodes);
+                    chooseLeast(1, nodes, excludedNodes);
             if (selectedNodes.length == 0) {
                 throw new NotEnoughReplicasException(
                         "Not able to place enough replicas");
@@ -325,17 +325,17 @@ class ReplicationTargetChooser {
 
     /* Randomly choose <i>numOfReplicas</i> targets from <i>nodes</i>.
      */
-    private void chooseRandom(int numOfReplicas,
-                              String nodes,
-                              List<Node> excludedNodes,
-                              long blocksize,
-                              int maxNodesPerRack,
-                              List<DatanodeDescriptor> results)
+    private void chooseLeast(int numOfReplicas,
+                             String nodes,
+                             List<Node> excludedNodes,
+                             long blocksize,
+                             int maxNodesPerRack,
+                             List<DatanodeDescriptor> results)
             throws NotEnoughReplicasException {
         boolean toContinue = true;
         do {
             DatanodeDescriptor[] selectedNodes =
-                    chooseRandom(numOfReplicas, nodes, excludedNodes);
+                    chooseLeast(numOfReplicas, nodes, excludedNodes);
             if (selectedNodes.length < numOfReplicas) {
                 toContinue = false;
             }
@@ -357,24 +357,49 @@ class ReplicationTargetChooser {
     /* Randomly choose <i>numOfNodes</i> nodes from <i>scope</i>.
      * @return the choosen nodes
      */
-    private DatanodeDescriptor[] chooseRandom(int numOfReplicas,
-                                              String nodes,
-                                              List<Node> excludedNodes) {
+    private DatanodeDescriptor[] chooseLeast(int numOfReplicas,
+                                             String nodes,
+                                             List<Node> excludedNodes) {
         List<DatanodeDescriptor> results =
                 new ArrayList<DatanodeDescriptor>();
+        List<DatanodeDescriptor> intermediateResults =
+                new ArrayList<DatanodeDescriptor>();
+        List<Node> intermediateExcludedNodes = excludedNodes;
+
         int numOfAvailableNodes =
                 clusterMap.countNumOfAvailableNodes(nodes, excludedNodes);
         numOfReplicas = (numOfAvailableNodes < numOfReplicas) ?
                 numOfAvailableNodes : numOfReplicas;
-        while (numOfReplicas > 0) {
+        //这里把所有节点取出来，按照负载排序，选择最低的numOfReplicas个节点
+        while (numOfAvailableNodes > 0){
             DatanodeDescriptor choosenNode =
                     (DatanodeDescriptor) (clusterMap.chooseRandom(nodes));
+            if (!intermediateExcludedNodes.contains(choosenNode)) {
+                intermediateResults.add(choosenNode);
+                intermediateExcludedNodes.add(choosenNode);
+                numOfAvailableNodes--;
+            }
+        }
+        //比较器用来比较两个Datanode之间负载的大小
+        Comparator<DatanodeDescriptor> comparator = new Comparator<DatanodeDescriptor>() {
+            @Override
+            public int compare(DatanodeDescriptor o1, DatanodeDescriptor o2) {
+                return o1.getXceiverCount()-o2.getXceiverCount();
+            }
+        };
+        intermediateResults.sort(comparator);
+        results = intermediateResults.subList(0,numOfReplicas);
+        excludedNodes.addAll(results);
+        /*
+        while (numOfReplicas > 0) {
+            DatanodeDescriptor choosenNode =
+                    (DatanodeDescriptor) (clusterMap.chooseLeast(nodes));
             if (!excludedNodes.contains(choosenNode)) {
                 results.add(choosenNode);
                 excludedNodes.add(choosenNode);
                 numOfReplicas--;
             }
-        }
+        }*/
         return (DatanodeDescriptor[]) results.toArray(
                 new DatanodeDescriptor[results.size()]);
     }
