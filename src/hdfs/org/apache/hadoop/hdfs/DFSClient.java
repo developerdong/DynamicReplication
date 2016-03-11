@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs;
 
 import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -1137,6 +1138,8 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         private boolean gotEOS = false;
 
         byte[] skipBuf = null;
+        byte[] dataBuf = null;
+        private int dataOff;
         ByteBuffer checksumBytes = null;
         int dataLeft = 0;
         boolean isLastPacket = false;
@@ -1282,7 +1285,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 }
 
                 int dataLen = in.readInt();
-
+                int compressedDataLen = in.readInt();
                 // Sanity check the lengths
                 if (dataLen < 0 ||
                         ((dataLen % bytesPerChecksum) != 0 && !lastPacketInBlock) ||
@@ -1301,6 +1304,20 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 if (dataLen > 0) {
                     IOUtils.readFully(in, checksumBytes.array(), 0,
                             checksumBytes.limit());
+
+                    dataBuf = new byte[dataLen];
+                    dataOff = 0;
+                    if(dataLen == compressedDataLen){
+                        IOUtils.readFully(in, dataBuf, 0,
+                                dataLen);
+                    }
+                    else{
+                        byte[] compressedDataBuf = new byte[compressedDataLen];
+                        IOUtils.readFully(in, compressedDataBuf, 0,
+                                compressedDataLen);
+                        LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
+                        decompressor.decompress(compressedDataBuf, 0, dataBuf, 0, dataLen);
+                    }
                 }
             }
 
@@ -1308,7 +1325,8 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
             if (chunkLen > 0) {
                 // len should be >= chunkLen
-                IOUtils.readFully(in, buf, offset, chunkLen);
+                System.arraycopy(dataBuf, dataOff, buf, offset, chunkLen);
+                dataOff += chunkLen;
                 checksumBytes.get(checksumBuf, 0, checksumSize);
             }
 
