@@ -17,30 +17,23 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.util.LinkedList;
-import java.util.zip.CRC32;
-import java.util.zip.Checksum;
-
+import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.FSInputChecker;
 import org.apache.hadoop.fs.FSOutputSummer;
-import org.apache.hadoop.hdfs.protocol.Block;
-import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
-import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
-import org.apache.hadoop.hdfs.protocol.FSConstants;
-import org.apache.hadoop.hdfs.protocol.LocatedBlock;
+import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
+
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.zip.CRC32;
+import java.util.zip.Checksum;
 
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
@@ -409,7 +402,7 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
 
         buf.position(endOfHeader);
         int len = buf.getInt();
-
+        int compressedLen = buf.getInt();
         if (len < 0) {
             throw new IOException("Got wrong length during writeBlock(" + block +
                     ") from " + inAddr + " at offset " +
@@ -423,57 +416,122 @@ class BlockReceiver implements java.io.Closeable, FSConstants {
 
             int checksumLen = ((len + bytesPerChecksum - 1) / bytesPerChecksum) *
                     checksumSize;
+            //如果数据未被压缩
+            if(compressedLen == len){
+                if (buf.remaining() != (checksumLen + len)) {
+                    throw new IOException("Data remaining in packet does not match " +
+                            "sum of checksumLen and dataLen");
+                }
+                int checksumOff = buf.position();
+                int dataOff = checksumOff + checksumLen;
+                byte pktBuf[] = buf.array();
 
-            if (buf.remaining() != (checksumLen + len)) {
-                throw new IOException("Data remaining in packet does not match " +
-                        "sum of checksumLen and dataLen");
-            }
-            int checksumOff = buf.position();
-            int dataOff = checksumOff + checksumLen;
-            byte pktBuf[] = buf.array();
+                buf.position(buf.limit()); // move to the end of the data.
 
-            buf.position(buf.limit()); // move to the end of the data.
-
-      /* skip verifying checksum iff this is not the last one in the 
+      /* skip verifying checksum iff this is not the last one in the
        * pipeline and clientName is non-null. i.e. Checksum is verified
-       * on all the datanodes when the data is being written by a 
-       * datanode rather than a client. Whe client is writing the data, 
-       * protocol includes acks and only the last datanode needs to verify 
+       * on all the datanodes when the data is being written by a
+       * datanode rather than a client. Whe client is writing the data,
+       * protocol includes acks and only the last datanode needs to verify
        * checksum.
        */
-            if (mirrorOut == null || clientName.length() == 0) {
-                verifyChunks(pktBuf, dataOff, len, pktBuf, checksumOff);
-            }
-
-            try {
-                if (!finalized) {
-                    //finally write to the disk :
-                    out.write(pktBuf, dataOff, len);
-
-                    // If this is a partial chunk, then verify that this is the only
-                    // chunk in the packet. Calculate new crc for this chunk.
-                    if (partialCrc != null) {
-                        if (len > bytesPerChecksum) {
-                            throw new IOException("Got wrong length during writeBlock(" +
-                                    block + ") from " + inAddr + " " +
-                                    "A packet can have only one partial chunk." +
-                                    " len = " + len +
-                                    " bytesPerChecksum " + bytesPerChecksum);
-                        }
-                        partialCrc.update(pktBuf, dataOff, len);
-                        byte[] buf = FSOutputSummer.convertToByteStream(partialCrc, checksumSize);
-                        checksumOut.write(buf);
-                        LOG.debug("Writing out partial crc for data len " + len);
-                        partialCrc = null;
-                    } else {
-                        checksumOut.write(pktBuf, checksumOff, checksumLen);
-                    }
-                    datanode.myMetrics.bytesWritten.inc(len);
+                if (mirrorOut == null || clientName.length() == 0) {
+                    verifyChunks(pktBuf, dataOff, len, pktBuf, checksumOff);
                 }
-            } catch (IOException iex) {
-                datanode.checkDiskError(iex);
-                throw iex;
+
+                try {
+                    if (!finalized) {
+                        //finally write to the disk :
+                        out.write(pktBuf, dataOff, len);
+
+                        // If this is a partial chunk, then verify that this is the only
+                        // chunk in the packet. Calculate new crc for this chunk.
+                        if (partialCrc != null) {
+                            if (len > bytesPerChecksum) {
+                                throw new IOException("Got wrong length during writeBlock(" +
+                                        block + ") from " + inAddr + " " +
+                                        "A packet can have only one partial chunk." +
+                                        " len = " + len +
+                                        " bytesPerChecksum " + bytesPerChecksum);
+                            }
+                            partialCrc.update(pktBuf, dataOff, len);
+                            byte[] buf = FSOutputSummer.convertToByteStream(partialCrc, checksumSize);
+                            checksumOut.write(buf);
+                            LOG.debug("Writing out partial crc for data len " + len);
+                            partialCrc = null;
+                        } else {
+                            checksumOut.write(pktBuf, checksumOff, checksumLen);
+                        }
+                        datanode.myMetrics.bytesWritten.inc(len);
+                    }
+                } catch (IOException iex) {
+                    datanode.checkDiskError(iex);
+                    throw iex;
+                }
             }
+            //如果数据被压缩
+            else if(compressedLen < len){
+                if (buf.remaining() != (checksumLen + compressedLen)) {
+                    throw new IOException("Compressed data remaining in packet does not match " +
+                            "sum of checksumLen and compressed dataLen");
+                }
+                int checksumOff = buf.position();
+                int compressedDataOff = checksumOff + checksumLen;
+                byte pktBuf[] = buf.array();
+
+                buf.position(buf.limit()); // move to the end of the data.
+
+                byte[] decompressedDataBuf = new byte[len];
+                LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
+                decompressor.decompress(pktBuf, compressedDataOff, decompressedDataBuf, 0,len);
+
+
+
+      /* skip verifying checksum iff this is not the last one in the
+       * pipeline and clientName is non-null. i.e. Checksum is verified
+       * on all the datanodes when the data is being written by a
+       * datanode rather than a client. Whe client is writing the data,
+       * protocol includes acks and only the last datanode needs to verify
+       * checksum.
+       */
+                if (mirrorOut == null || clientName.length() == 0) {
+                    verifyChunks(decompressedDataBuf, 0, len, pktBuf, checksumOff);
+                }
+
+                try {
+                    if (!finalized) {
+                        //finally write to the disk :
+                        out.write(decompressedDataBuf, 0, len);
+
+                        // If this is a partial chunk, then verify that this is the only
+                        // chunk in the packet. Calculate new crc for this chunk.
+                        if (partialCrc != null) {
+                            if (len > bytesPerChecksum) {
+                                throw new IOException("Got wrong length during writeBlock(" +
+                                        block + ") from " + inAddr + " " +
+                                        "A packet can have only one partial chunk." +
+                                        " len = " + len +
+                                        " bytesPerChecksum " + bytesPerChecksum);
+                            }
+                            partialCrc.update(decompressedDataBuf, 0, len);
+                            byte[] buf = FSOutputSummer.convertToByteStream(partialCrc, checksumSize);
+                            checksumOut.write(buf);
+                            LOG.debug("Writing out partial crc for data len " + len);
+                            partialCrc = null;
+                        } else {
+                            checksumOut.write(pktBuf, checksumOff, checksumLen);
+                        }
+                        datanode.myMetrics.bytesWritten.inc(len);
+                    }
+                } catch (IOException iex) {
+                    datanode.checkDiskError(iex);
+                    throw iex;
+                }
+            }
+            else{
+                throw new IOException("compressed length is more than data length, there is a transfer error");
+            }
+
         }
 
         /// flush entire packet before sending ack
