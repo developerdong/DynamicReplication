@@ -2794,7 +2794,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
         private void computePacketChunkSize(int psize, int csize) {
             int chunkSize = csize + checksum.getChecksumSize();
-            int n = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER;
+            int n = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
             chunksPerPacket = Math.max((psize - n + chunkSize - 1) / chunkSize, 1);
             packetSize = n + chunkSize * chunksPerPacket;
             if (LOG.isDebugEnabled()) {
@@ -3293,7 +3293,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
         synchronized void setChunksPerPacket(int value) {
             chunksPerPacket = Math.min(chunksPerPacket, value);
-            packetSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER +
+            packetSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2 +
                     (checksum.getBytesPerChecksum() +
                             checksum.getChecksumSize()) * chunksPerPacket;
         }
