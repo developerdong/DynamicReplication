@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -230,61 +232,83 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
         int len = Math.min((int) (endOffset - offset),
                 bytesPerChecksum * maxChunks);
+        int compressedLen = len;
         if (len == 0) {
             return 0;
         }
 
         int numChunks = (len + bytesPerChecksum - 1) / bytesPerChecksum;
-        int packetLen = len + numChunks * checksumSize + 4;
+        int packetLen = len + numChunks * checksumSize + 4 * 2;
         pkt.clear();
 
-        // write packet header
-        pkt.putInt(packetLen);
-        pkt.putLong(offset);
-        pkt.putLong(seqno);
-        pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
-        //why no ByteBuf.putBoolean()?
-        pkt.putInt(len);
+        if (socket.getInetAddress() != socket.getLocalAddress()){
+            LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
+            int maxCompressedLength = compressor.maxCompressedLength(len);
+            byte[] compressedBuf = new byte[maxCompressedLength];
+            byte[] originalBuf = new byte[len];
 
-        int checksumOff = pkt.position();
-        int checksumLen = numChunks * checksumSize;
-        byte[] buf = pkt.array();
+            IOUtils.readFully(blockIn, originalBuf, 0, len);
+            compressedLen = compressor.compress(originalBuf, 0, len, compressedBuf, 0);
+            //如果压缩后长度变短，就进行数据复制
+            if(compressedLen < len){
+                packetLen = compressedLen + numChunks * checksumSize + 4 * 2;
+            }
+            else{
+                compressedLen = len;
+            }
 
-        if (checksumSize > 0 && checksumIn != null) {
-            try {
-                checksumIn.readFully(buf, checksumOff, checksumLen);
-            } catch (IOException e) {
-                LOG.warn(" Could not read or failed to veirfy checksum for data" +
-                        " at offset " + offset + " for block " + block + " got : "
-                        + StringUtils.stringifyException(e));
-                IOUtils.closeStream(checksumIn);
-                checksumIn = null;
-                if (corruptChecksumOk) {
-                    if (checksumOff < checksumLen) {
-                        // Just fill the array with zeros.
-                        Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+            // write packet header
+            pkt.putInt(packetLen);
+            pkt.putLong(offset);
+            pkt.putLong(seqno);
+            pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
+            //why no ByteBuf.putBoolean()?
+            pkt.putInt(len);
+            pkt.putInt(compressedLen);
+
+            int checksumOff = pkt.position();
+            int checksumLen = numChunks * checksumSize;
+            byte[] buf = pkt.array();
+
+            if (checksumSize > 0 && checksumIn != null) {
+                try {
+                    checksumIn.readFully(buf, checksumOff, checksumLen);
+                } catch (IOException e) {
+                    LOG.warn(" Could not read or failed to veirfy checksum for data" +
+                            " at offset " + offset + " for block " + block + " got : "
+                            + StringUtils.stringifyException(e));
+                    IOUtils.closeStream(checksumIn);
+                    checksumIn = null;
+                    if (corruptChecksumOk) {
+                        if (checksumOff < checksumLen) {
+                            // Just fill the array with zeros.
+                            Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+                        }
+                    } else {
+                        throw e;
                     }
-                } else {
-                    throw e;
                 }
             }
-        }
 
-        int dataOff = checksumOff + checksumLen;
+            int compressedDataOff = checksumOff + checksumLen;
 
-        if (blockInPosition < 0) {
             //normal transfer
-            IOUtils.readFully(blockIn, buf, dataOff, len);
+            if(compressedLen < len){
+                System.arraycopy(compressedBuf, 0, buf, compressedDataOff, compressedLen);
+            }
+            else{
+                System.arraycopy(originalBuf, 0, buf, compressedDataOff, len);
+            }
 
             if (verifyChecksum) {
-                int dOff = dataOff;
+                int dOff = 0;
                 int cOff = checksumOff;
                 int dLeft = len;
 
                 for (int i = 0; i < numChunks; i++) {
                     checksum.reset();
                     int dLen = Math.min(dLeft, bytesPerChecksum);
-                    checksum.update(buf, dOff, dLen);
+                    checksum.update(originalBuf, dOff, dLen);
                     if (!checksum.compare(buf, cOff)) {
                         throw new ChecksumException("Checksum failed at " +
                                 (offset + len - dLeft), len);
@@ -295,36 +319,111 @@ class BlockSender implements java.io.Closeable, FSConstants {
                 }
             }
             //writing is done below (mainly to handle IOException)
-        }
-
-        try {
-            if (blockInPosition >= 0) {
-                //use transferTo(). Checks on out and blockIn are already done.
-
-                SocketOutputStream sockOut = (SocketOutputStream) out;
-                //first write the packet
-                sockOut.write(buf, 0, dataOff);
-                // no need to flush. since we know out is not a buffered stream.
-
-                sockOut.transferToFully(((FileInputStream) blockIn).getChannel(),
-                        blockInPosition, len);
-
-                blockInPosition += len;
-            } else {
+            try {
                 // normal transfer
-                out.write(buf, 0, dataOff + len);
-            }
-
-        } catch (IOException e) {
+                out.write(buf, 0, compressedDataOff + compressedLen);
+            } catch (IOException e) {
       /* exception while writing to the client (well, with transferTo(),
        * it could also be while reading from the local file).
        */
-            throw ioeToSocketException(e);
+                throw ioeToSocketException(e);
+            }
+
+            if (throttler != null) { // rebalancing so throttle
+                throttler.throttle(packetLen);
+            }
+        }
+        else{
+            // write packet header
+            pkt.putInt(packetLen);
+            pkt.putLong(offset);
+            pkt.putLong(seqno);
+            pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
+            //why no ByteBuf.putBoolean()?
+            pkt.putInt(len);
+            pkt.putInt(compressedLen);
+
+            int checksumOff = pkt.position();
+            int checksumLen = numChunks * checksumSize;
+            byte[] buf = pkt.array();
+
+            if (checksumSize > 0 && checksumIn != null) {
+                try {
+                    checksumIn.readFully(buf, checksumOff, checksumLen);
+                } catch (IOException e) {
+                    LOG.warn(" Could not read or failed to veirfy checksum for data" +
+                            " at offset " + offset + " for block " + block + " got : "
+                            + StringUtils.stringifyException(e));
+                    IOUtils.closeStream(checksumIn);
+                    checksumIn = null;
+                    if (corruptChecksumOk) {
+                        if (checksumOff < checksumLen) {
+                            // Just fill the array with zeros.
+                            Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+
+            int dataOff = checksumOff + checksumLen;
+
+            if (blockInPosition < 0) {
+                //normal transfer
+                IOUtils.readFully(blockIn, buf, dataOff, len);
+
+                if (verifyChecksum) {
+                    int dOff = dataOff;
+                    int cOff = checksumOff;
+                    int dLeft = len;
+
+                    for (int i = 0; i < numChunks; i++) {
+                        checksum.reset();
+                        int dLen = Math.min(dLeft, bytesPerChecksum);
+                        checksum.update(buf, dOff, dLen);
+                        if (!checksum.compare(buf, cOff)) {
+                            throw new ChecksumException("Checksum failed at " +
+                                    (offset + len - dLeft), len);
+                        }
+                        dLeft -= dLen;
+                        dOff += dLen;
+                        cOff += checksumSize;
+                    }
+                }
+                //writing is done below (mainly to handle IOException)
+            }
+
+            try {
+                if (blockInPosition >= 0) {
+                    //use transferTo(). Checks on out and blockIn are already done.
+
+                    SocketOutputStream sockOut = (SocketOutputStream) out;
+                    //first write the packet
+                    sockOut.write(buf, 0, dataOff);
+                    // no need to flush. since we know out is not a buffered stream.
+
+                    sockOut.transferToFully(((FileInputStream) blockIn).getChannel(),
+                            blockInPosition, len);
+
+                    blockInPosition += len;
+                } else {
+                    // normal transfer
+                    out.write(buf, 0, dataOff + len);
+                }
+
+            } catch (IOException e) {
+      /* exception while writing to the client (well, with transferTo(),
+       * it could also be while reading from the local file).
+       */
+                throw ioeToSocketException(e);
+            }
+
+            if (throttler != null) { // rebalancing so throttle
+                throttler.throttle(packetLen);
+            }
         }
 
-        if (throttler != null) { // rebalancing so throttle
-            throttler.throttle(packetLen);
-        }
 
         return len;
     }
