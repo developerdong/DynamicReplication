@@ -17,18 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.SocketException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Arrays;
-
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hdfs.protocol.Block;
@@ -38,6 +26,13 @@ import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
 
+import java.io.*;
+import java.net.Socket;
+import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Arrays;
+
 /**
  * Reads a block from the disk and sends it to a recipient.
  */
@@ -45,6 +40,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
     public static final Log LOG = DataNode.LOG;
     static final Log ClientTraceLog = DataNode.ClientTraceLog;
 
+    private Socket socket;
     private Block block; // the block to read from
     private InputStream blockIn; // data stream
     private long blockInPosition = -1; // updated while using transferTo().
@@ -75,14 +71,14 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
     BlockSender(Block block, long startOffset, long length,
                 boolean corruptChecksumOk, boolean chunkOffsetOK,
-                boolean verifyChecksum, DataNode datanode) throws IOException {
+                boolean verifyChecksum, DataNode datanode, Socket socket) throws IOException {
         this(block, startOffset, length, corruptChecksumOk, chunkOffsetOK,
-                verifyChecksum, datanode, null);
+                verifyChecksum, datanode, null, socket);
     }
 
     BlockSender(Block block, long startOffset, long length,
                 boolean corruptChecksumOk, boolean chunkOffsetOK,
-                boolean verifyChecksum, DataNode datanode, String clientTraceFmt)
+                boolean verifyChecksum, DataNode datanode, String clientTraceFmt, Socket socket)
             throws IOException {
         try {
             this.block = block;
@@ -92,7 +88,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
             this.blockLength = datanode.data.getLength(block);
             this.transferToAllowed = datanode.transferToAllowed;
             this.clientTraceFmt = clientTraceFmt;
-
+            this.socket = socket;
             if (!corruptChecksumOk || datanode.data.metaFileExists(block)) {
                 checksumIn = new DataInputStream(
                         new BufferedInputStream(datanode.data.getMetaDataInputStream(block),

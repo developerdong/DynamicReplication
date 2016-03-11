@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketException;
-
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol;
@@ -40,6 +30,11 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
+
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.SocketException;
 
 import static org.apache.hadoop.hdfs.server.datanode.DataNode.DN_CLIENTTRACE_FORMAT;
 
@@ -171,7 +166,7 @@ class DataXceiver implements Runnable, FSConstants {
         try {
             try {
                 blockSender = new BlockSender(block, startOffset, length,
-                        true, true, false, datanode, clientTraceFmt);
+                        true, true, false, datanode, clientTraceFmt, s);
             } catch (IOException e) {
                 out.writeShort(DataTransferProtocol.OP_STATUS_ERROR);
                 throw e;
@@ -492,7 +487,7 @@ class DataXceiver implements Runnable, FSConstants {
         try {
             // check if the block exists or not
             blockSender = new BlockSender(block, 0, -1, false, false, false,
-                    datanode);
+                    datanode, s);
 
             // set up response stream
             OutputStream baseStream = NetUtils.getOutputStream(
