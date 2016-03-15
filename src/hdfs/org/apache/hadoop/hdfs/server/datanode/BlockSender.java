@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.DataChecksum;
@@ -294,6 +295,10 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
             //normal transfer
             if(compressedLen < len){
+                NameNode.compressionLog.info("len is " + len);
+                NameNode.compressionLog.info("compressedLen equals " + compressedLen);
+                NameNode.compressionLog.info("buf len equals " + buf.length);
+                NameNode.compressionLog.info("data off equals " + compressedDataOff);
                 System.arraycopy(compressedBuf, 0, buf, compressedDataOff, compressedLen);
             }
             else{
@@ -464,29 +469,38 @@ class BlockSender implements java.io.Closeable, FSConstants {
             }
 
             int maxChunksPerPacket;
-            int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER;
-
-            if (transferToAllowed && !verifyChecksum &&
-                    baseStream instanceof SocketOutputStream &&
-                    blockIn instanceof FileInputStream) {
-
-                FileChannel fileChannel = ((FileInputStream) blockIn).getChannel();
-
-                // blockInPosition also indicates sendChunks() uses transferTo.
-                blockInPosition = fileChannel.position();
-                streamForSendChunks = baseStream;
-
-                // assure a mininum buffer size.
-                maxChunksPerPacket = (Math.max(BUFFER_SIZE,
-                        MIN_BUFFER_WITH_TRANSFERTO)
-                        + bytesPerChecksum - 1) / bytesPerChecksum;
-
-                // allocate smaller buffer while using transferTo().
-                pktSize += checksumSize * maxChunksPerPacket;
-            } else {
+            int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
+            if (socket.getInetAddress() != socket.getLocalAddress()){
+                NameNode.compressionLog.info("use buf");
                 maxChunksPerPacket = Math.max(1,
                         (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
                 pktSize += (bytesPerChecksum + checksumSize) * maxChunksPerPacket;
+                NameNode.compressionLog.info("pktSize is " + pktSize);
+            }
+            else{
+                if (transferToAllowed && !verifyChecksum &&
+                        baseStream instanceof SocketOutputStream &&
+                        blockIn instanceof FileInputStream) {
+                    NameNode.compressionLog.info("use transfer to");
+                    FileChannel fileChannel = ((FileInputStream) blockIn).getChannel();
+
+                    // blockInPosition also indicates sendChunks() uses transferTo.
+                    blockInPosition = fileChannel.position();
+                    streamForSendChunks = baseStream;
+
+                    // assure a mininum buffer size.
+                    maxChunksPerPacket = (Math.max(BUFFER_SIZE,
+                            MIN_BUFFER_WITH_TRANSFERTO)
+                            + bytesPerChecksum - 1) / bytesPerChecksum;
+
+                    // allocate smaller buffer while using transferTo().
+                    pktSize += checksumSize * maxChunksPerPacket;
+                } else {
+                    NameNode.compressionLog.info("use buf");
+                    maxChunksPerPacket = Math.max(1,
+                            (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
+                    pktSize += (bytesPerChecksum + checksumSize) * maxChunksPerPacket;
+                }
             }
 
             ByteBuffer pktBuf = ByteBuffer.allocate(pktSize);
