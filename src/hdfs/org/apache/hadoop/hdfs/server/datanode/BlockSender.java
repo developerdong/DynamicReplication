@@ -242,7 +242,9 @@ class BlockSender implements java.io.Closeable, FSConstants {
         int packetLen = len + numChunks * checksumSize + 4 * 2;
         pkt.clear();
 
-        if ((socket != null)&&(socket.getInetAddress() != socket.getLocalAddress())){
+        if ((socket != null)&&(!socket.getInetAddress().getHostAddress().equals(socket.getLocalAddress().getHostAddress()))){
+            NameNode.compressionLog.info("remote inet address is " + socket.getInetAddress().getHostAddress());
+            NameNode.compressionLog.info("local inet address is " + socket.getInetAddress().getHostAddress());
             LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
             int maxCompressedLength = compressor.maxCompressedLength(len);
             byte[] compressedBuf = new byte[maxCompressedLength];
@@ -295,10 +297,6 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
             //normal transfer
             if(compressedLen < len){
-                NameNode.compressionLog.info("len is " + len);
-                NameNode.compressionLog.info("compressedLen equals " + compressedLen);
-                NameNode.compressionLog.info("buf len equals " + buf.length);
-                NameNode.compressionLog.info("data off equals " + compressedDataOff);
                 System.arraycopy(compressedBuf, 0, buf, compressedDataOff, compressedLen);
             }
             else{
@@ -428,7 +426,8 @@ class BlockSender implements java.io.Closeable, FSConstants {
                 throttler.throttle(packetLen);
             }
         }
-
+        NameNode.compressionLog.info("len is " + len);
+        NameNode.compressionLog.info("compressedLen equals " + compressedLen);
 
         return len;
     }
@@ -470,7 +469,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
             int maxChunksPerPacket;
             int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
-            if ((socket != null)&&(socket.getInetAddress() != socket.getLocalAddress())){
+            if ((socket != null)&&(!socket.getInetAddress().getHostAddress().equals(socket.getLocalAddress().getHostAddress()))){
                 NameNode.compressionLog.info("use buf");
                 maxChunksPerPacket = Math.max(1,
                         (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
