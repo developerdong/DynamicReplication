@@ -2252,7 +2252,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 /* 如果不是本地传输，就尝试压缩；
                  * 否则不尝试压缩
                  */
-                if (s.getInetAddress() != s.getLocalAddress()){
+                if (!s.getInetAddress().getHostAddress().equals(s.getLocalAddress().getHostAddress())){
                     LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
                     int maxCompressedLength = compressor.maxCompressedLength(dataLen);
                     byte[] compressedBuf = new byte[maxCompressedLength];
