@@ -242,7 +242,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
         int packetLen = len + numChunks * checksumSize + 4 * 2;
         pkt.clear();
 
-        if (socket.getInetAddress() != socket.getLocalAddress()){
+        if ((socket != null)&&(socket.getInetAddress() != socket.getLocalAddress())){
             LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
             int maxCompressedLength = compressor.maxCompressedLength(len);
             byte[] compressedBuf = new byte[maxCompressedLength];
@@ -470,7 +470,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
             int maxChunksPerPacket;
             int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
-            if (socket.getInetAddress() != socket.getLocalAddress()){
+            if ((socket != null)&&(socket.getInetAddress() != socket.getLocalAddress())){
                 NameNode.compressionLog.info("use buf");
                 maxChunksPerPacket = Math.max(1,
                         (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
