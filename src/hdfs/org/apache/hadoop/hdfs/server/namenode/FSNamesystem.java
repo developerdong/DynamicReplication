@@ -4412,17 +4412,16 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             int srcReplication = inode.getReplication();
             long srcAccessTime = inode.getAccessTime();
 
+            //插入成功且副本数不是最小副本数则在原集合中删除
+            if((insertFileIntoNewSet(src, srcReplication, srcAccessTime))&&(srcReplication > minDynamicReplication)){
+                replicationSets.get(srcReplication).remove(src);
+                NameNode.allocationLog.info(src + " was removed from set " + srcReplication);
+            }
 
-            if(insertFileIntoNewSet(src, srcReplication, srcAccessTime)){
-                //插入成功且副本数不是最小副本数则在原集合中删除
-                if(srcReplication > minDynamicReplication) {
-                    replicationSets.get(srcReplication).remove(src);
-                    NameNode.allocationLog.info(src + " was removed from set " + srcReplication);
-                    //如果是最小文件则更新最小文件
-                    if(minAccessTimeFile.get(srcReplication).equals(src)) {
-                        updateMinAccessTimeFileOfSet(srcReplication);
-                    }
-                }
+
+            //如果是最小文件则更新最小文件
+            if((srcReplication > minDynamicReplication)&&(minAccessTimeFile.get(srcReplication).equals(src))) {
+                updateMinAccessTimeFileOfSet(srcReplication);
             }
 
 
@@ -4459,11 +4458,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
                 NameNode.allocationLog.info("begin to scan set " + rep);
                 ArrayList<String> replicationSet = replicationSets.get(rep);
-                //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
+
                 if(!replicationSet.isEmpty()){
                     NameNode.allocationLog.info("min access time file of set " + rep + " is " + minAccessTimeFile.get(rep));
                     NameNode.allocationLog.info("min access time of set " + rep + " is " + dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime());
                 }
+
+                //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
                     //插入新集合
                     replicationSet.add(src);
