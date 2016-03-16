@@ -1337,18 +1337,13 @@ class FSDirectory implements FSConstants, Closeable {
                 //使用指数平均法来计算平均访问时间
                 long newAccessTime;
                 float alpha = namesystem.getAlpha();
-                //如果atime更小，即第一次访问，则访问时间不变
-                if(atime <= inodeTime){
-                    NameNode.allocationLog.info("first time visit");
-                    newAccessTime = inodeTime;
-                }
-                else{
-                    BigDecimal bigInodeTime = new BigDecimal(String.valueOf(inodeTime));
-                    BigDecimal bigOne = new BigDecimal(String.valueOf(1));
-                    BigDecimal bigAlpha = new BigDecimal(String.valueOf(alpha));
-                    BigDecimal bigAtime = new BigDecimal(String.valueOf(atime));
-                    newAccessTime = bigInodeTime.multiply(bigOne.subtract(bigAlpha)).add(bigAtime.multiply(bigAlpha)).longValue();
-                }
+                //使用BigDecimal来精确计算
+                BigDecimal bigInodeTime = new BigDecimal(String.valueOf(inodeTime));
+                BigDecimal bigOne = new BigDecimal(String.valueOf(1));
+                BigDecimal bigAlpha = new BigDecimal(String.valueOf(alpha));
+                BigDecimal bigAtime = new BigDecimal(String.valueOf(atime));
+                newAccessTime = bigInodeTime.multiply(bigOne.subtract(bigAlpha)).add(bigAtime.multiply(bigAlpha)).longValue();
+
                 NameNode.allocationLog.info("new access time of file is " + newAccessTime);
                 inode.setAccessTime(newAccessTime);
                 NameNode.allocationLog.info("end update access time of file " + src);
