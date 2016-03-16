@@ -421,7 +421,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 clusterMap);
 
         this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
-        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 0.13f);
+        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 10.0f);
         this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
         //this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
         this.defaultReplication = conf.getInt("dfs.replication", 3);
@@ -4386,9 +4386,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 return (int)(dir.getFileINode(o1).getAccessTime()-dir.getFileINode(o2).getAccessTime());
             }
         };
-        DynamicReplicationMonitor(){
-            this.initialize(6,3,0.8f);
-        }
         DynamicReplicationMonitor(int maxDynamicReplication, int minDynamicReplication, float capacityUsedPercentTop){
             this.initialize(maxDynamicReplication, minDynamicReplication,capacityUsedPercentTop);
         }
@@ -4427,7 +4424,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
 
             //对空间是否达到上限进行判断处理
-            if( (1 - getCapacityRemainingPercent()) > capacityUsedPercentTop){
+            NameNode.allocationLog.info("before check capacity");
+            NameNode.allocationLog.info("capacity remaing is " + getCapacityRemainingPercent());
+            if( (100 - getCapacityRemainingPercent()) > capacityUsedPercentTop){
+                NameNode.allocationLog.info("begin to decrease capacity use");
                 //从低副本集合向高副本集合扫描
                 for(int rep = minDynamicReplication +1; rep <= maxDynamicReplication; rep++){
                     //获得文件集合，集合中每个文件副本数为rep
@@ -4448,7 +4448,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                         replicationSets.get(rep-1).addAll(halfReplicationSet);
                     }
                 }
+                NameNode.allocationLog.info("end decreasing capacity use");
             }
+            NameNode.allocationLog.info("after check capacity");
         }
         /**
          * 尝试将文件插入新集合，成功插入则返回true，accessTime太小不满足插入条件就返回false
@@ -4509,7 +4511,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             }
             if(!newFile.equals(oldFile)){
                 minAccessTimeFile.put(rep, newFile);
-                NameNode.allocationLog.info(newFile + " is the minAccessTimeFile of set " + rep);
+                NameNode.allocationLog.info(newFile + " is the new minAccessTimeFile of set " + rep);
                 return true;
             }
             return false;
