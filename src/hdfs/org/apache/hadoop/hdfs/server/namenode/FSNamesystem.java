@@ -4439,10 +4439,10 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     for(String file : halfReplicationSet){
                         setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
                     }
+                    //更新rep文件集合中最小accessTimeFile
+                    minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
                     //从原集合移除这一半文件
                     replicationSet.removeAll(halfReplicationSet);
-                    //更新rep文件集合中最小accessTimeFile
-                    updateMinAccessTimeFileOfSet(rep);
                     //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
                     if(rep > minDynamicReplication +1){
                         replicationSets.get(rep-1).addAll(halfReplicationSet);
