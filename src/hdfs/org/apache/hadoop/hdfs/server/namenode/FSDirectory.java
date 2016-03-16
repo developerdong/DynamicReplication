@@ -1325,8 +1325,10 @@ class FSDirectory implements FSConstants, Closeable {
 
             // if the last access time update was within the last precision interval, then
             // no need to store access time
-            //if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
-            if (atime <= inodeTime + 10000 && !force) {
+            NameNode.allocationLog.info("access time precision is " + namesystem.getAccessTimePrecision());
+            NameNode.allocationLog.info("old access time of file is " + inodeTime);
+            NameNode.allocationLog.info("now access time of file is " + atime);
+            if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
                 status = false;
             } else {
                 NameNode.allocationLog.info("begin to update access time of file " + src);
@@ -1345,8 +1347,6 @@ class FSDirectory implements FSConstants, Closeable {
                     BigDecimal bigAtime = new BigDecimal(String.valueOf(atime));
                     newAccessTime = bigInodeTime.multiply(bigOne.subtract(bigAlpha)).add(bigAtime.multiply(bigAlpha)).longValue();
                 }
-                NameNode.allocationLog.info("old access time of file is " + inodeTime);
-                NameNode.allocationLog.info("now access time of file is " + atime);
                 NameNode.allocationLog.info("new access time of file is " + newAccessTime);
                 inode.setAccessTime(newAccessTime);
                 NameNode.allocationLog.info("end update access time of file " + src);
