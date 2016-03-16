@@ -1333,7 +1333,6 @@ class FSDirectory implements FSConstants, Closeable {
             if (atime <= inodeTime + accessTimePrecision && !force) {
                 status = false;
             } else {
-                NameNode.allocationLog.info("begin to update access time of file " + src);
                 //使用指数平均法来计算平均访问时间
                 long newAccessTime;
                 float alpha = namesystem.getAlpha();
@@ -1346,7 +1345,6 @@ class FSDirectory implements FSConstants, Closeable {
 
                 NameNode.allocationLog.info("new access time of file " + src + " is " + newAccessTime);
                 inode.setAccessTime(newAccessTime);
-                NameNode.allocationLog.info("end update access time of file " + src);
 
                 //尝试执行副本更新算法
                 NameNode.allocationLog.info("begin update replication of file " + src);
