@@ -1322,13 +1322,15 @@ class FSDirectory implements FSConstants, Closeable {
         }
         if (atime != -1) {
             long inodeTime = inode.getAccessTime();
-
+            long accessTimePrecision = namesystem.getAccessTimePrecision();
+            //judge accessTimePrecision is bigger than top line or not
+            accessTimePrecision = accessTimePrecision<30000?accessTimePrecision:30000;
             // if the last access time update was within the last precision interval, then
             // no need to store access time
-            NameNode.allocationLog.info("access time precision is " + namesystem.getAccessTimePrecision());
+            NameNode.allocationLog.info("access time precision is " + accessTimePrecision);
             NameNode.allocationLog.info("old access time of file is " + inodeTime);
             NameNode.allocationLog.info("now access time of file is " + atime);
-            if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
+            if (atime <= inodeTime + accessTimePrecision && !force) {
                 status = false;
             } else {
                 NameNode.allocationLog.info("begin to update access time of file " + src);
