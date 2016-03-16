@@ -4432,20 +4432,22 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 for(int rep = minDynamicReplication +1; rep <= maxDynamicReplication; rep++){
                     //获得文件集合，集合中每个文件副本数为rep
                     ArrayList<String> replicationSet = replicationSets.get(rep);
-                    //对集合进行排序，选取accessTime最小的那一半文件
-                    replicationSet.sort(accessTimeComparator);
-                    ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
-                    //这一半文件的副本数都减一
-                    for(String file : halfReplicationSet){
-                        setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
-                    }
-                    //更新rep文件集合中最小accessTimeFile
-                    minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
-                    //从原集合移除这一半文件
-                    replicationSet.removeAll(halfReplicationSet);
-                    //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
-                    if(rep > minDynamicReplication +1){
-                        replicationSets.get(rep-1).addAll(halfReplicationSet);
+                    if (!replicationSet.isEmpty()){
+                        //对集合进行排序，选取accessTime最小的那一半文件
+                        replicationSet.sort(accessTimeComparator);
+                        ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
+                        //这一半文件的副本数都减一
+                        for(String file : halfReplicationSet){
+                            setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
+                        }
+                        //更新rep文件集合中最小accessTimeFile
+                        minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
+                        //从原集合移除这一半文件
+                        replicationSet.removeAll(halfReplicationSet);
+                        //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
+                        if(rep > minDynamicReplication +1){
+                            replicationSets.get(rep-1).addAll(halfReplicationSet);
+                        }
                     }
                 }
                 NameNode.allocationLog.info("end decreasing capacity use");
