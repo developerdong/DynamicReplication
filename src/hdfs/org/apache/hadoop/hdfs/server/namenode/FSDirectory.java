@@ -17,23 +17,30 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.*;
-import java.util.*;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.permission.*;
-import org.apache.hadoop.hdfs.protocol.ClientProtocol;
-import org.apache.hadoop.metrics.MetricsRecord;
-import org.apache.hadoop.metrics.MetricsUtil;
-import org.apache.hadoop.metrics.MetricsContext;
-import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.namenode.BlocksMap.BlockInfo;
+import org.apache.hadoop.metrics.MetricsContext;
+import org.apache.hadoop.metrics.MetricsRecord;
+import org.apache.hadoop.metrics.MetricsUtil;
+
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /*************************************************
  * FSDirectory stores the filesystem directory state.
@@ -1332,9 +1339,14 @@ class FSDirectory implements FSConstants, Closeable {
                     newAccessTime = inodeTime;
                 }
                 else{
-                    newAccessTime = (long)(inodeTime * (1 - alpha) + atime * alpha);
+                    BigDecimal bigInodeTime = new BigDecimal(String.valueOf(inodeTime));
+                    BigDecimal bigOne = new BigDecimal(String.valueOf(1));
+                    BigDecimal bigAlpha = new BigDecimal(String.valueOf(alpha));
+                    BigDecimal bigAtime = new BigDecimal(String.valueOf(atime));
+                    newAccessTime = bigInodeTime.multiply(bigOne.subtract(bigAlpha)).add(bigAtime.multiply(bigAlpha)).longValue();
                 }
                 NameNode.allocationLog.info("old access time of file is " + inodeTime);
+                NameNode.allocationLog.info("now access time of file is " + atime);
                 NameNode.allocationLog.info("new access time of file is " + newAccessTime);
                 inode.setAccessTime(newAccessTime);
                 NameNode.allocationLog.info("end update access time of file " + src);
