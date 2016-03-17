@@ -17,26 +17,24 @@
  */
 package org.apache.hadoop.hdfs.server.datanode;
 
-import java.io.BufferedInputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.SocketException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.Arrays;
-
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.SocketOutputStream;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.StringUtils;
+
+import java.io.*;
+import java.net.Socket;
+import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.util.Arrays;
 
 /**
  * Reads a block from the disk and sends it to a recipient.
@@ -45,6 +43,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
     public static final Log LOG = DataNode.LOG;
     static final Log ClientTraceLog = DataNode.ClientTraceLog;
 
+    private Socket socket;
     private Block block; // the block to read from
     private InputStream blockIn; // data stream
     private long blockInPosition = -1; // updated while using transferTo().
@@ -75,14 +74,14 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
     BlockSender(Block block, long startOffset, long length,
                 boolean corruptChecksumOk, boolean chunkOffsetOK,
-                boolean verifyChecksum, DataNode datanode) throws IOException {
+                boolean verifyChecksum, DataNode datanode, Socket socket) throws IOException {
         this(block, startOffset, length, corruptChecksumOk, chunkOffsetOK,
-                verifyChecksum, datanode, null);
+                verifyChecksum, datanode, null, socket);
     }
 
     BlockSender(Block block, long startOffset, long length,
                 boolean corruptChecksumOk, boolean chunkOffsetOK,
-                boolean verifyChecksum, DataNode datanode, String clientTraceFmt)
+                boolean verifyChecksum, DataNode datanode, String clientTraceFmt, Socket socket)
             throws IOException {
         try {
             this.block = block;
@@ -92,7 +91,7 @@ class BlockSender implements java.io.Closeable, FSConstants {
             this.blockLength = datanode.data.getLength(block);
             this.transferToAllowed = datanode.transferToAllowed;
             this.clientTraceFmt = clientTraceFmt;
-
+            this.socket = socket;
             if (!corruptChecksumOk || datanode.data.metaFileExists(block)) {
                 checksumIn = new DataInputStream(
                         new BufferedInputStream(datanode.data.getMetaDataInputStream(block),
@@ -234,61 +233,85 @@ class BlockSender implements java.io.Closeable, FSConstants {
 
         int len = Math.min((int) (endOffset - offset),
                 bytesPerChecksum * maxChunks);
+        int compressedLen = len;
         if (len == 0) {
             return 0;
         }
 
         int numChunks = (len + bytesPerChecksum - 1) / bytesPerChecksum;
-        int packetLen = len + numChunks * checksumSize + 4;
+        int packetLen = len + numChunks * checksumSize + 4 * 2;
         pkt.clear();
 
-        // write packet header
-        pkt.putInt(packetLen);
-        pkt.putLong(offset);
-        pkt.putLong(seqno);
-        pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
-        //why no ByteBuf.putBoolean()?
-        pkt.putInt(len);
+        if ((socket != null)&&(!socket.getInetAddress().getHostAddress().equals(socket.getLocalAddress().getHostAddress()))){
+            NameNode.compressionLog.info("remote inet address is " + socket.getInetAddress().getHostAddress());
+            NameNode.compressionLog.info("local inet address is " + socket.getInetAddress().getHostAddress());
+            LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
+            int maxCompressedLength = compressor.maxCompressedLength(len);
+            byte[] compressedBuf = new byte[maxCompressedLength];
+            byte[] originalBuf = new byte[len];
 
-        int checksumOff = pkt.position();
-        int checksumLen = numChunks * checksumSize;
-        byte[] buf = pkt.array();
+            IOUtils.readFully(blockIn, originalBuf, 0, len);
+            compressedLen = compressor.compress(originalBuf, 0, len, compressedBuf, 0);
+            //如果压缩后长度变短，就进行数据复制
+            if(compressedLen < len){
+                packetLen = compressedLen + numChunks * checksumSize + 4 * 2;
+            }
+            else{
+                compressedLen = len;
+            }
 
-        if (checksumSize > 0 && checksumIn != null) {
-            try {
-                checksumIn.readFully(buf, checksumOff, checksumLen);
-            } catch (IOException e) {
-                LOG.warn(" Could not read or failed to veirfy checksum for data" +
-                        " at offset " + offset + " for block " + block + " got : "
-                        + StringUtils.stringifyException(e));
-                IOUtils.closeStream(checksumIn);
-                checksumIn = null;
-                if (corruptChecksumOk) {
-                    if (checksumOff < checksumLen) {
-                        // Just fill the array with zeros.
-                        Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+            // write packet header
+            pkt.putInt(packetLen);
+            pkt.putLong(offset);
+            pkt.putLong(seqno);
+            pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
+            //why no ByteBuf.putBoolean()?
+            pkt.putInt(len);
+            pkt.putInt(compressedLen);
+
+            int checksumOff = pkt.position();
+            int checksumLen = numChunks * checksumSize;
+            byte[] buf = pkt.array();
+
+            if (checksumSize > 0 && checksumIn != null) {
+                try {
+                    checksumIn.readFully(buf, checksumOff, checksumLen);
+                } catch (IOException e) {
+                    LOG.warn(" Could not read or failed to veirfy checksum for data" +
+                            " at offset " + offset + " for block " + block + " got : "
+                            + StringUtils.stringifyException(e));
+                    IOUtils.closeStream(checksumIn);
+                    checksumIn = null;
+                    if (corruptChecksumOk) {
+                        if (checksumOff < checksumLen) {
+                            // Just fill the array with zeros.
+                            Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+                        }
+                    } else {
+                        throw e;
                     }
-                } else {
-                    throw e;
                 }
             }
-        }
 
-        int dataOff = checksumOff + checksumLen;
+            int compressedDataOff = checksumOff + checksumLen;
 
-        if (blockInPosition < 0) {
             //normal transfer
-            IOUtils.readFully(blockIn, buf, dataOff, len);
+            if(compressedLen < len){
+                System.arraycopy(compressedBuf, 0, buf, compressedDataOff, compressedLen);
+            }
+            else{
+                System.arraycopy(originalBuf, 0, buf, compressedDataOff, len);
+            }
 
             if (verifyChecksum) {
-                int dOff = dataOff;
+                int dOff = 0;
                 int cOff = checksumOff;
                 int dLeft = len;
 
                 for (int i = 0; i < numChunks; i++) {
                     checksum.reset();
                     int dLen = Math.min(dLeft, bytesPerChecksum);
-                    checksum.update(buf, dOff, dLen);
+                    checksum.update(originalBuf, dOff, dLen);
                     if (!checksum.compare(buf, cOff)) {
                         throw new ChecksumException("Checksum failed at " +
                                 (offset + len - dLeft), len);
@@ -299,36 +322,112 @@ class BlockSender implements java.io.Closeable, FSConstants {
                 }
             }
             //writing is done below (mainly to handle IOException)
-        }
-
-        try {
-            if (blockInPosition >= 0) {
-                //use transferTo(). Checks on out and blockIn are already done.
-
-                SocketOutputStream sockOut = (SocketOutputStream) out;
-                //first write the packet
-                sockOut.write(buf, 0, dataOff);
-                // no need to flush. since we know out is not a buffered stream.
-
-                sockOut.transferToFully(((FileInputStream) blockIn).getChannel(),
-                        blockInPosition, len);
-
-                blockInPosition += len;
-            } else {
+            try {
                 // normal transfer
-                out.write(buf, 0, dataOff + len);
-            }
-
-        } catch (IOException e) {
+                out.write(buf, 0, compressedDataOff + compressedLen);
+            } catch (IOException e) {
       /* exception while writing to the client (well, with transferTo(),
        * it could also be while reading from the local file).
        */
-            throw ioeToSocketException(e);
-        }
+                throw ioeToSocketException(e);
+            }
 
-        if (throttler != null) { // rebalancing so throttle
-            throttler.throttle(packetLen);
+            if (throttler != null) { // rebalancing so throttle
+                throttler.throttle(packetLen);
+            }
         }
+        else{
+            // write packet header
+            pkt.putInt(packetLen);
+            pkt.putLong(offset);
+            pkt.putLong(seqno);
+            pkt.put((byte) ((offset + len >= endOffset) ? 1 : 0));
+            //why no ByteBuf.putBoolean()?
+            pkt.putInt(len);
+            pkt.putInt(compressedLen);
+
+            int checksumOff = pkt.position();
+            int checksumLen = numChunks * checksumSize;
+            byte[] buf = pkt.array();
+
+            if (checksumSize > 0 && checksumIn != null) {
+                try {
+                    checksumIn.readFully(buf, checksumOff, checksumLen);
+                } catch (IOException e) {
+                    LOG.warn(" Could not read or failed to veirfy checksum for data" +
+                            " at offset " + offset + " for block " + block + " got : "
+                            + StringUtils.stringifyException(e));
+                    IOUtils.closeStream(checksumIn);
+                    checksumIn = null;
+                    if (corruptChecksumOk) {
+                        if (checksumOff < checksumLen) {
+                            // Just fill the array with zeros.
+                            Arrays.fill(buf, checksumOff, checksumLen, (byte) 0);
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+
+            int dataOff = checksumOff + checksumLen;
+
+            if (blockInPosition < 0) {
+                //normal transfer
+                IOUtils.readFully(blockIn, buf, dataOff, len);
+
+                if (verifyChecksum) {
+                    int dOff = dataOff;
+                    int cOff = checksumOff;
+                    int dLeft = len;
+
+                    for (int i = 0; i < numChunks; i++) {
+                        checksum.reset();
+                        int dLen = Math.min(dLeft, bytesPerChecksum);
+                        checksum.update(buf, dOff, dLen);
+                        if (!checksum.compare(buf, cOff)) {
+                            throw new ChecksumException("Checksum failed at " +
+                                    (offset + len - dLeft), len);
+                        }
+                        dLeft -= dLen;
+                        dOff += dLen;
+                        cOff += checksumSize;
+                    }
+                }
+                //writing is done below (mainly to handle IOException)
+            }
+
+            try {
+                if (blockInPosition >= 0) {
+                    //use transferTo(). Checks on out and blockIn are already done.
+
+                    SocketOutputStream sockOut = (SocketOutputStream) out;
+                    //first write the packet
+                    sockOut.write(buf, 0, dataOff);
+                    // no need to flush. since we know out is not a buffered stream.
+
+                    sockOut.transferToFully(((FileInputStream) blockIn).getChannel(),
+                            blockInPosition, len);
+
+                    blockInPosition += len;
+                } else {
+                    // normal transfer
+                    out.write(buf, 0, dataOff + len);
+                }
+
+            } catch (IOException e) {
+      /* exception while writing to the client (well, with transferTo(),
+       * it could also be while reading from the local file).
+       */
+                throw ioeToSocketException(e);
+            }
+
+            if (throttler != null) { // rebalancing so throttle
+                throttler.throttle(packetLen);
+            }
+        }
+        NameNode.compressionLog.info("len is " + len);
+        NameNode.compressionLog.info("compressedLen equals " + compressedLen);
 
         return len;
     }
@@ -369,29 +468,38 @@ class BlockSender implements java.io.Closeable, FSConstants {
             }
 
             int maxChunksPerPacket;
-            int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER;
-
-            if (transferToAllowed && !verifyChecksum &&
-                    baseStream instanceof SocketOutputStream &&
-                    blockIn instanceof FileInputStream) {
-
-                FileChannel fileChannel = ((FileInputStream) blockIn).getChannel();
-
-                // blockInPosition also indicates sendChunks() uses transferTo.
-                blockInPosition = fileChannel.position();
-                streamForSendChunks = baseStream;
-
-                // assure a mininum buffer size.
-                maxChunksPerPacket = (Math.max(BUFFER_SIZE,
-                        MIN_BUFFER_WITH_TRANSFERTO)
-                        + bytesPerChecksum - 1) / bytesPerChecksum;
-
-                // allocate smaller buffer while using transferTo().
-                pktSize += checksumSize * maxChunksPerPacket;
-            } else {
+            int pktSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
+            if ((socket != null)&&(!socket.getInetAddress().getHostAddress().equals(socket.getLocalAddress().getHostAddress()))){
+                NameNode.compressionLog.info("use buf");
                 maxChunksPerPacket = Math.max(1,
                         (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
                 pktSize += (bytesPerChecksum + checksumSize) * maxChunksPerPacket;
+                NameNode.compressionLog.info("pktSize is " + pktSize);
+            }
+            else{
+                if (transferToAllowed && !verifyChecksum &&
+                        baseStream instanceof SocketOutputStream &&
+                        blockIn instanceof FileInputStream) {
+                    NameNode.compressionLog.info("use transfer to");
+                    FileChannel fileChannel = ((FileInputStream) blockIn).getChannel();
+
+                    // blockInPosition also indicates sendChunks() uses transferTo.
+                    blockInPosition = fileChannel.position();
+                    streamForSendChunks = baseStream;
+
+                    // assure a mininum buffer size.
+                    maxChunksPerPacket = (Math.max(BUFFER_SIZE,
+                            MIN_BUFFER_WITH_TRANSFERTO)
+                            + bytesPerChecksum - 1) / bytesPerChecksum;
+
+                    // allocate smaller buffer while using transferTo().
+                    pktSize += checksumSize * maxChunksPerPacket;
+                } else {
+                    NameNode.compressionLog.info("use buf");
+                    maxChunksPerPacket = Math.max(1,
+                            (BUFFER_SIZE + bytesPerChecksum - 1) / bytesPerChecksum);
+                    pktSize += (bytesPerChecksum + checksumSize) * maxChunksPerPacket;
+                }
             }
 
             ByteBuffer pktBuf = ByteBuffer.allocate(pktSize);
