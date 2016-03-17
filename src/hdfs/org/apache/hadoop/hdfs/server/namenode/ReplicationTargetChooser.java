@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.commons.logging.*;
+import org.apache.commons.logging.Log;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.LocatedBlock;
@@ -148,7 +148,7 @@ class ReplicationTargetChooser {
         if (writer == null && !newBlock) {
             writer = (DatanodeDescriptor) results.get(0);
         }
-
+        NameNode.placementLog.info("begin to choose target");
         try {
             switch (numOfResults) {
                 case 0:
@@ -185,6 +185,7 @@ class ReplicationTargetChooser {
             FSNamesystem.LOG.warn("Not able to place enough replicas, still in need of "
                     + numOfReplicas);
         }
+        NameNode.placementLog.info("end choosing target");
         return writer;
     }
 
@@ -200,6 +201,7 @@ class ReplicationTargetChooser {
             int maxNodesPerRack,
             List<DatanodeDescriptor> results)
             throws NotEnoughReplicasException {
+        NameNode.placementLog.info("attempt to choose local node");
         // if no local machine, randomly choose one node
         if (localMachine == null)
             return chooseLeast(NodeBase.ROOT, excludedNodes,
@@ -234,6 +236,7 @@ class ReplicationTargetChooser {
             int maxNodesPerRack,
             List<DatanodeDescriptor> results)
             throws NotEnoughReplicasException {
+        NameNode.placementLog.info("attempt to choose local rack");
         // no local machine, so choose a random machine
         if (localMachine == null) {
             return chooseLeast(NodeBase.ROOT, excludedNodes,
@@ -287,6 +290,7 @@ class ReplicationTargetChooser {
                                   int maxReplicasPerRack,
                                   List<DatanodeDescriptor> results)
             throws NotEnoughReplicasException {
+        NameNode.placementLog.info("attempt to choose remote rack");
         int oldNumOfReplicas = results.size();
         // randomly choose one node from remote racks
         try {
@@ -388,8 +392,14 @@ class ReplicationTargetChooser {
                 return o1.getXceiverCount()-o2.getXceiverCount();
             }
         };
+        for(DatanodeDescriptor descriptor : intermediateResults){
+            NameNode.placementLog.info("the xceiverCount of intermediateResult " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
+        }
         intermediateResults.sort(comparator);
         results = intermediateResults.subList(0,numOfReplicas);
+        for(DatanodeDescriptor descriptor : results){
+            NameNode.placementLog.info("the xceiverCount of result " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
+        }
         excludedNodes.addAll(results);
         NameNode.placementLog.info("end choose least");
         /*
