@@ -149,15 +149,18 @@ class ReplicationTargetChooser {
             writer = (DatanodeDescriptor) results.get(0);
         }
         NameNode.placementLog.info("begin to choose target");
+
         try {
             switch (numOfResults) {
                 case 0:
+                    NameNode.placementLog.info("before choose local node, numOfReplicas is " + numOfReplicas);
                     writer = chooseLocalNode(writer, excludedNodes,
                             blocksize, maxNodesPerRack, results);
                     if (--numOfReplicas == 0) {
                         break;
                     }
                 case 1:
+                    NameNode.placementLog.info("before choose remote rack, numOfReplicas is " + numOfReplicas);
                     chooseRemoteRack(1, results.get(0), excludedNodes,
                             blocksize, maxNodesPerRack, results);
                     if (--numOfReplicas == 0) {
@@ -293,10 +296,15 @@ class ReplicationTargetChooser {
         NameNode.placementLog.info("attempt to choose remote rack");
         int oldNumOfReplicas = results.size();
         // randomly choose one node from remote racks
+        NameNode.placementLog.info("before try, numOfReplicas is " + numOfReplicas);
+        NameNode.placementLog.info("local machine newwork location is " + localMachine.getNetworkLocation());
         try {
             chooseLeast(numOfReplicas, "~" + localMachine.getNetworkLocation(),
                     excludedNodes, blocksize, maxReplicasPerRack, results);
         } catch (NotEnoughReplicasException e) {
+            NameNode.placementLog.info("when cathch not enough replicas exception,numOfReplicas is " + numOfReplicas);
+            NameNode.placementLog.info("results size is " + results.size());
+            NameNode.placementLog.info("oldNumOfReplicas is " + oldNumOfReplicas);
             chooseLeast(numOfReplicas - (results.size() - oldNumOfReplicas),
                     localMachine.getNetworkLocation(), excludedNodes, blocksize,
                     maxReplicasPerRack, results);
@@ -370,9 +378,9 @@ class ReplicationTargetChooser {
         List<DatanodeDescriptor> intermediateResults =
                 new ArrayList<DatanodeDescriptor>();
         List<Node> intermediateExcludedNodes = excludedNodes;
-
         int numOfAvailableNodes =
                 clusterMap.countNumOfAvailableNodes(nodes, excludedNodes);
+        NameNode.placementLog.info("available nodes is " + numOfAvailableNodes);
         numOfReplicas = (numOfAvailableNodes < numOfReplicas) ?
                 numOfAvailableNodes : numOfReplicas;
         //这里把所有节点取出来，按照负载排序，选择最低的numOfReplicas个节点
@@ -396,12 +404,14 @@ class ReplicationTargetChooser {
             NameNode.placementLog.info("the xceiverCount of intermediateResult " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
         }
         intermediateResults.sort(comparator);
+        NameNode.placementLog.info("numOfReplicas is " + numOfReplicas);
         results = intermediateResults.subList(0,numOfReplicas);
         for(DatanodeDescriptor descriptor : results){
             NameNode.placementLog.info("the xceiverCount of result " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
         }
         excludedNodes.addAll(results);
         NameNode.placementLog.info("end choose least");
+        //TODO 这里对numOfReplicas的大小进行判断，大于0才行
         /*
         while (numOfReplicas > 0) {
             DatanodeDescriptor choosenNode =
