@@ -296,6 +296,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     public void allocateReplication(String src,INodeFile inode) throws IOException {
         this.dynamicReplicationMonitor.allocateReplication(src, inode);
     }
+
+    //尝试删除
+    public boolean attemptToDeleteFileFromDynamicReplicationSet(String src, int rep){
+        return this.dynamicReplicationMonitor.deleteFileFromOldSet(src, rep);
+    }
     /**
      * FSNamesystem constructor.
      */
@@ -421,7 +426,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 clusterMap);
 
         this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
-        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 10.0f);
+        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 80.0f);
         this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
         //this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
         this.defaultReplication = conf.getInt("dfs.replication", 3);
@@ -4495,7 +4500,19 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             }
             return false;
         }
-
+        /**
+         * 尝试将文件从动态集合中删除
+         */
+        private boolean deleteFileFromOldSet(String src, int rep){
+            boolean result = false;
+            if(rep > minReplication){
+                result = replicationSets.get(rep).remove(src);
+                if(minAccessTimeFile.get(rep).equals(src)){
+                    updateMinAccessTimeFileOfSet(rep);
+                }
+            }
+            return result;
+        }
         /**
          * 更新rep对应集合中accessTime最小的文件
          */

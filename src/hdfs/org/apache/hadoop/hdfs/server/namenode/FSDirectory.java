@@ -581,11 +581,19 @@ class FSDirectory implements FSConstants, Closeable {
         if (NameNode.stateChangeLog.isDebugEnabled()) {
             NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + src);
         }
+        //先取出受影响的文件
+        FileStatus[] files = getListing(src);
         waitForReady();
         long now = FSNamesystem.now();
         INode deletedNode = unprotectedDelete(src, now);
         if (deletedNode != null) {
             fsImage.getEditLog().logDelete(src, now);
+            //删除成功则调用api尝试从动态集合中删除
+            if(files != null){
+                for(FileStatus file : files){
+                    namesystem.attemptToDeleteFileFromDynamicReplicationSet(file.getPath().toString(), file.getReplication());
+                }
+            }
         }
         return deletedNode;
     }
