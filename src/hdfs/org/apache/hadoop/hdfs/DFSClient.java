@@ -2253,16 +2253,19 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                  * 否则不尝试压缩
                  */
                 if (!s.getInetAddress().getHostAddress().equals(s.getLocalAddress().getHostAddress())){
+                    NameNode.compressionLog.info("DFSClient: remote transfer");
                     LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
                     int maxCompressedLength = compressor.maxCompressedLength(dataLen);
                     byte[] compressedBuf = new byte[maxCompressedLength];
                     compressedDataLen = compressor.compress(buf, dataStart, dataLen, compressedBuf, 0);
                     //如果压缩后长度变短，就进行数据复制
                     if(compressedDataLen < dataLen){
+                        NameNode.compressionLog.info("DFSClient: use compression");
                         pktLen = SIZE_OF_INTEGER * 2 + compressedDataLen + checksumLen;
                         System.arraycopy(compressedBuf, 0, buf, dataStart, compressedDataLen);
                     }
                     else{
+                        NameNode.compressionLog.info("DFSClient: dont't use compression");
                         compressedDataLen = dataLen;
                     }
                 }
