@@ -4505,10 +4505,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
          */
         private boolean deleteFileFromOldSet(String src, int rep){
             boolean result = false;
-            if(rep > minReplication){
-                result = replicationSets.get(rep).remove(src);
-                if(minAccessTimeFile.get(rep).equals(src)){
-                    updateMinAccessTimeFileOfSet(rep);
+            if((rep > minReplication)&&(rep <= maxReplication)){
+                ArrayList<String> replicationSet = replicationSets.get(rep);
+                if(replicationSet != null){
+                    result = replicationSet.remove(src);
+                    if(minAccessTimeFile.get(rep).equals(src)){
+                        updateMinAccessTimeFileOfSet(rep);
+                    }
                 }
             }
             return result;
