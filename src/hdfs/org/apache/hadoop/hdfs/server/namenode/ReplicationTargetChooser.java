@@ -383,35 +383,32 @@ class ReplicationTargetChooser {
         NameNode.placementLog.info("available nodes is " + numOfAvailableNodes);
         numOfReplicas = (numOfAvailableNodes < numOfReplicas) ?
                 numOfAvailableNodes : numOfReplicas;
-        //这里把所有节点取出来，按照负载排序，选择最低的numOfReplicas个节点
-        while (numOfAvailableNodes > 0){
-            DatanodeDescriptor choosenNode =
-                    (DatanodeDescriptor) (clusterMap.chooseRandom(nodes));
-            if (!intermediateExcludedNodes.contains(choosenNode)) {
-                intermediateResults.add(choosenNode);
-                intermediateExcludedNodes.add(choosenNode);
-                numOfAvailableNodes--;
+        if(numOfReplicas > 0){
+            //这里把所有节点取出来，按照负载排序，选择最低的numOfReplicas个节点
+            while (numOfAvailableNodes > 0){
+                DatanodeDescriptor choosenNode =
+                        (DatanodeDescriptor) (clusterMap.chooseRandom(nodes));
+                if (!intermediateExcludedNodes.contains(choosenNode)) {
+                    intermediateResults.add(choosenNode);
+                    intermediateExcludedNodes.add(choosenNode);
+                    numOfAvailableNodes--;
+                }
             }
-        }
-        //比较器用来比较两个Datanode之间负载的大小
-        Comparator<DatanodeDescriptor> comparator = new Comparator<DatanodeDescriptor>() {
-            @Override
-            public int compare(DatanodeDescriptor o1, DatanodeDescriptor o2) {
-                return o1.getXceiverCount()-o2.getXceiverCount();
+            //比较器用来比较两个Datanode之间负载的大小
+            Comparator<DatanodeDescriptor> comparator = new Comparator<DatanodeDescriptor>() {
+                @Override
+                public int compare(DatanodeDescriptor o1, DatanodeDescriptor o2) {
+                    return o1.getXceiverCount()-o2.getXceiverCount();
+                }
+            };
+            for(DatanodeDescriptor descriptor : intermediateResults){
+                NameNode.placementLog.info("the xceiverCount of intermediateResult " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
             }
-        };
-        for(DatanodeDescriptor descriptor : intermediateResults){
-            NameNode.placementLog.info("the xceiverCount of intermediateResult " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
+            intermediateResults.sort(comparator);
+            results = intermediateResults.subList(0,numOfReplicas);
+            excludedNodes.addAll(results);
         }
-        intermediateResults.sort(comparator);
-        NameNode.placementLog.info("numOfReplicas is " + numOfReplicas);
-        results = intermediateResults.subList(0,numOfReplicas);
-        for(DatanodeDescriptor descriptor : results){
-            NameNode.placementLog.info("the xceiverCount of result " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
-        }
-        excludedNodes.addAll(results);
         NameNode.placementLog.info("end choose least");
-        //TODO 这里对numOfReplicas的大小进行判断，大于0才行
         /*
         while (numOfReplicas > 0) {
             DatanodeDescriptor choosenNode =
