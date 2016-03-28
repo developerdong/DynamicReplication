@@ -6,7 +6,9 @@
 # remote nodes.
 
 # The java implementation to use.  Required.
-export JAVA_HOME=/home/dong/jdk1.6.0_45
+
+export JAVA_HOME=/home/dong/jdk1.8.0_40
+
 
 # Extra Java CLASSPATH elements.  Optional.
 # export HADOOP_CLASSPATH=
