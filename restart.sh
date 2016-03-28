@@ -16,6 +16,7 @@ scp -r build dong@192.168.1.37:/home/dong/DynamicReplication/
 scp -r build dong@192.168.1.38:/home/dong/DynamicReplication/
 scp -r build dong@192.168.1.39:/home/dong/DynamicReplication/
 
+ 
 ssh dong@192.168.1.29 "sh /home/dong/DynamicReplication/bin/start-all.sh"
 
 
