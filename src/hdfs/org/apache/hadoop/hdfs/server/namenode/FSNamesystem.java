@@ -296,6 +296,11 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     public void allocateReplication(String src,INodeFile inode) throws IOException {
         this.dynamicReplicationMonitor.allocateReplication(src, inode);
     }
+
+    //尝试删除
+    public boolean attemptToDeleteFileFromDynamicReplicationSet(String src, int rep){
+        return this.dynamicReplicationMonitor.deleteFileFromOldSet(src, rep);
+    }
     /**
      * FSNamesystem constructor.
      */
@@ -4494,7 +4499,19 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             }
             return false;
         }
-
+        /**
+         * 尝试将文件从动态集合中删除
+         */
+        private boolean deleteFileFromOldSet(String src, int rep){
+            boolean result = false;
+            if(rep > minReplication){
+                result = replicationSets.get(rep).remove(src);
+                if(minAccessTimeFile.get(rep).equals(src)){
+                    updateMinAccessTimeFileOfSet(rep);
+                }
+            }
+            return result;
+        }
         /**
          * 更新rep对应集合中accessTime最小的文件
          */
