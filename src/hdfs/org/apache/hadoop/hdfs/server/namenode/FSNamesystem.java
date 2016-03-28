@@ -421,7 +421,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 clusterMap);
 
         this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
-        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 10.0f);
+        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 80.0f);
         this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
         //this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
         this.defaultReplication = conf.getInt("dfs.replication", 3);
