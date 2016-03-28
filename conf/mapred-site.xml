@@ -6,6 +6,6 @@
 <configuration>
     <property>
         <name>mapred.job.tracker</name>
-        <value>http://192.168.1.128:9001</value>
+        <value>brix-409b52:9001</value>
     </property>
 </configuration>
