@@ -34,3 +34,4 @@ ssh dong@192.168.1.29 "/home/dong/DynamicReplication/bin/hadoop namenode -format
 ssh dong@192.168.1.29 "sh /home/dong/DynamicReplication/bin/start-all.sh"
 
 
+
