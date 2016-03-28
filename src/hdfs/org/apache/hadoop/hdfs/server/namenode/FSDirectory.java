@@ -591,7 +591,9 @@ class FSDirectory implements FSConstants, Closeable {
             //删除成功则调用api尝试从动态集合中删除
             if(files != null){
                 for(FileStatus file : files){
-                    namesystem.attemptToDeleteFileFromDynamicReplicationSet(file.getPath().toString(), file.getReplication());
+                    if(!file.isDir()){
+                        namesystem.attemptToDeleteFileFromDynamicReplicationSet(file.getPath().toString(), file.getReplication());
+                    }
                 }
             }
         }
