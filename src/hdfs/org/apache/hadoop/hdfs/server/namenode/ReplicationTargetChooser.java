@@ -407,6 +407,9 @@ class ReplicationTargetChooser {
             intermediateResults.sort(comparator);
             results = intermediateResults.subList(0,numOfReplicas);
             excludedNodes.addAll(results);
+            for(DatanodeDescriptor descriptor : results){
+                NameNode.placementLog.info("the xceiverCount of chosen result " + descriptor.getHost() + " is " + descriptor.getXceiverCount());
+            }
         }
         NameNode.placementLog.info("end choose least");
         /*
