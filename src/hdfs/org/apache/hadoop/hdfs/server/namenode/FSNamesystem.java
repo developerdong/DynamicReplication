@@ -4464,6 +4464,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
          * 尝试将文件插入新集合，成功插入则返回true，accessTime太小不满足插入条件就返回false
          */
         private boolean insertFileIntoNewSet(String src, int srcReplication, long srcAccessTime) throws IOException{
+            if(src.isEmpty()){
+                return false;
+            }
             //遍历比srcReplication副本数大的集合，尝试插入
             for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
                 NameNode.allocationLog.info("begin to scan set " + rep);
@@ -4504,6 +4507,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
          * 尝试将文件从动态集合中删除
          */
         private boolean deleteFileFromOldSet(String src, int rep){
+            if(src.isEmpty()){
+                return false;
+            }
             boolean result = false;
             if((rep > minReplication)&&(rep <= maxReplication)){
                 ArrayList<String> replicationSet = replicationSets.get(rep);
