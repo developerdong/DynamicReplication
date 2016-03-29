@@ -4533,10 +4533,14 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             long minAccessTime = Long.MAX_VALUE;
             //遍历集合，寻找是否有更小的元素
             for(String file:replicationSets.get(rep)){
-
-                if(dir.getFileInfo(file).getAccessTime() < minAccessTime){
-                    newFile = file;
+                FileStatus fileInfo = dir.getFileInfo(file);
+                if(fileInfo != null){
+                    if(fileInfo.getAccessTime() < minAccessTime){
+                        newFile = file;
+                        minAccessTime = fileInfo.getAccessTime();
+                    }
                 }
+
             }
             if(!newFile.equals(oldFile)){
                 minAccessTimeFile.put(rep, newFile);
