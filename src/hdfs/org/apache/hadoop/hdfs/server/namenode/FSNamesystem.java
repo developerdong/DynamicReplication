@@ -4410,6 +4410,12 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
          * 更新被访问文件的副本数
          */
         void allocateReplication(String src, INodeFile inode) throws IOException{
+            //对于只有一块的小文件，不进行调整
+            if(inode.getBlocks().length == 1){
+                NameNode.allocationLog.info("the block numbers of " + src + " is one,don't change its replication");
+                return;
+            }
+
             //获取文件信息
             int srcReplication = inode.getReplication();
             long srcAccessTime = inode.getAccessTime();
