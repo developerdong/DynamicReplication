@@ -479,6 +479,21 @@ class FSDirectory implements FSConstants, Closeable {
         return fileBlocks;
     }
 
+    Block[] setDynamicReplication(String src,
+                           short replication,
+                           int[] oldReplication
+    ) throws IOException {
+        waitForReady();
+        Block[] fileBlocks = unprotectedSetReplication(src, replication, oldReplication);
+        /* 这里不在EditLog中记录副本变化的原因是：
+         * 假如NameNode崩溃，重新启动时各个文件的副本数会重新设置为3，
+         * 而动态副本类中的文件集合会重新初始化，两者正好相适应，
+         * 如果记录了EditLog，各个文件的副本数有高有低，但是动态副本类中
+         * 集合并没有相应的记录会出问题
+         * */
+        return fileBlocks;
+    }
+
     Block[] unprotectedSetReplication(String src,
                                       short replication,
                                       int[] oldReplication
