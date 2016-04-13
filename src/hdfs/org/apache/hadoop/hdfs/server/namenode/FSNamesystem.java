@@ -4497,21 +4497,25 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
                 //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
-                    //插入新集合
-                    replicationSet.add(src);
-                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
-                    minAccessTimeFile.put(rep, src);
-                    NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
-                    //使用修改后的setReplication函数
-                    setDynamicReplication(src,(short)rep);
-                    return true;
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        //插入新集合
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
+                        minAccessTimeFile.put(rep, src);
+                        NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
+                        return true;
+                    }
+
                 }
                 else if(srcAccessTime >= dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
-                    replicationSet.add(src);
-                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    setDynamicReplication(src,(short)rep);
-                    return true;
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        return true;
+                    }
                 }
             }
             return false;
