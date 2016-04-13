@@ -4395,7 +4395,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         //动态副本调整空间上限，达到这个值应该减少副本数
         float capacityUsedPercentTop;
         //保存不同优先级的集合，最高优先级集合中文件副本数为dynamicMax，最低优先级集合中文件副本数为dynamicMin+1
-        Hashtable<Integer,ArrayList<String>> replicationSets;
+        Hashtable<Integer,LinkedList<String>> replicationSets;
         //保存每个集合中指数平均访问时间最小的文件
         Hashtable<Integer,String> minAccessTimeFile;
         //比较器用来比较两个文件之间指数平均访问时间的大小
@@ -4412,9 +4412,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             this.maxDynamicReplication = maxDynamicReplication;
             this.minDynamicReplication = minDynamicReplication;
             this.capacityUsedPercentTop = capacityUsedPercentTop;
-            this.replicationSets = new Hashtable<Integer, ArrayList<String>>();
+            this.replicationSets = new Hashtable<Integer, LinkedList<String>>();
             for(int i = minDynamicReplication+1;i <= maxDynamicReplication;i++){
-                replicationSets.put(i,new ArrayList<String>());
+                replicationSets.put(i,new LinkedList<String>());
             }
             this.minAccessTimeFile = new Hashtable<Integer, String>();
 
@@ -4456,23 +4456,27 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 //从低副本集合向高副本集合扫描
                 for(int rep = minDynamicReplication +1; rep <= maxDynamicReplication; rep++){
                     //获得文件集合，集合中每个文件副本数为rep
-                    ArrayList<String> replicationSet = replicationSets.get(rep);
+                    LinkedList<String> replicationSet = replicationSets.get(rep);
                     if (!replicationSet.isEmpty()){
                         //对集合进行排序，选取accessTime最小的那一半文件
                         replicationSet.sort(accessTimeComparator);
                         ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
                         //这一半文件的副本数都减一
                         for(String file : halfReplicationSet){
-                            setDynamicReplication(file,(short)(rep - 1));
+                            //修改副本数成功后才把文件转移到更低副本的集合
+                            if(setDynamicReplication(file,(short)(rep - 1))){
+                                //从原集合移除这一文件
+                                if(replicationSet.remove(file)){
+                                    //如果不是最后一个集合，那么该文件加入副本数更小的集合
+                                    if(rep > minDynamicReplication +1){
+                                        replicationSets.get(rep-1).add(file);
+                                    }
+                                }
+
+                            }
                         }
                         //更新rep文件集合中最小accessTimeFile
-                        minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
-                        //从原集合移除这一半文件
-                        replicationSet.removeAll(halfReplicationSet);
-                        //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
-                        if(rep > minDynamicReplication +1){
-                            replicationSets.get(rep-1).addAll(halfReplicationSet);
-                        }
+                        minAccessTimeFile.put(rep, replicationSet.get(0));
                     }
                 }
                 NameNode.allocationLog.info("end decreasing capacity use");
@@ -4489,7 +4493,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             //遍历比srcReplication副本数大的集合，尝试插入
             for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
                 NameNode.allocationLog.info("begin to scan set " + rep);
-                ArrayList<String> replicationSet = replicationSets.get(rep);
+                LinkedList<String> replicationSet = replicationSets.get(rep);
 
                 if(!replicationSet.isEmpty()){
                     NameNode.allocationLog.info("min access time file of set " + rep + " is " + minAccessTimeFile.get(rep));
@@ -4498,21 +4502,25 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
                 //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
                 if(replicationSet.isEmpty()){
-                    //插入新集合
-                    replicationSet.add(src);
-                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
-                    minAccessTimeFile.put(rep, src);
-                    NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
-                    //使用修改后的setReplication函数
-                    setDynamicReplication(src,(short)rep);
-                    return true;
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        //插入新集合
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
+                        minAccessTimeFile.put(rep, src);
+                        NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
+                        return true;
+                    }
+
                 }
                 else if(srcAccessTime >= dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
-                    replicationSet.add(src);
-                    NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    setDynamicReplication(src,(short)rep);
-                    return true;
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        return true;
+                    }
                 }
             }
             return false;
@@ -4526,7 +4534,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
             }
             boolean result = false;
             if((rep > minReplication)&&(rep <= maxReplication)){
-                ArrayList<String> replicationSet = replicationSets.get(rep);
+                LinkedList<String> replicationSet = replicationSets.get(rep);
                 if(replicationSet != null){
                     result = replicationSet.remove(src);
                     if(minAccessTimeFile.get(rep).equals(src)){
