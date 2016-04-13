@@ -4462,16 +4462,20 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                         ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
                         //这一半文件的副本数都减一
                         for(String file : halfReplicationSet){
-                            setDynamicReplication(file,(short)(rep - 1));
+                            //修改副本数成功后才把文件转移到更低副本的集合
+                            if(setDynamicReplication(file,(short)(rep - 1))){
+                                //从原集合移除这一文件
+                                if(replicationSet.remove(file)){
+                                    //如果不是最后一个集合，那么该文件加入副本数更小的集合
+                                    if(rep > minDynamicReplication +1){
+                                        replicationSets.get(rep-1).add(file);
+                                    }
+                                }
+
+                            }
                         }
                         //更新rep文件集合中最小accessTimeFile
-                        minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
-                        //从原集合移除这一半文件
-                        replicationSet.removeAll(halfReplicationSet);
-                        //如果不是最后一个集合，那么自己最小的一半文件加入副本数更小的集合
-                        if(rep > minDynamicReplication +1){
-                            replicationSets.get(rep-1).addAll(halfReplicationSet);
-                        }
+                        minAccessTimeFile.put(rep, replicationSet.get(0));
                     }
                 }
                 NameNode.allocationLog.info("end decreasing capacity use");
