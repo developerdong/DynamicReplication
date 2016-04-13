@@ -931,6 +931,18 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         return status;
     }
 
+    private boolean setDynamicReplication(String src, short replication)
+            throws IOException {
+        boolean status = setDynamicReplicationInternal(src, replication);
+        getEditLog().logSync();
+        if (status && auditLog.isInfoEnabled()) {
+            logAuditEvent(UserGroupInformation.getCurrentUGI(),
+                    Server.getRemoteIp(),
+                    "setReplication", src, null, null);
+        }
+        return status;
+    }
+
     private synchronized boolean setReplicationInternal(String src,
                                                         short replication
     ) throws IOException {
@@ -967,17 +979,18 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         return true;
     }
 
-    private synchronized boolean setReplicationInternalWithoutPermissionCheck(String src,
+    private synchronized boolean setDynamicReplicationInternal(String src,
                                                         short replication
     ) throws IOException {
         if (isInSafeMode())
             throw new SafeModeException("Cannot set replication for " + src, safeMode);
         verifyReplication(src, replication, null);
 
+        /*no permission check*/
 
         int[] oldReplication = new int[1];
         Block[] fileBlocks;
-        fileBlocks = dir.setReplication(src, replication, oldReplication);
+        fileBlocks = dir.setDynamicReplication(src, replication, oldReplication);
         if (fileBlocks == null)  // file not found or is a directory
             return false;
         int oldRepl = oldReplication[0];
@@ -4449,7 +4462,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                         ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
                         //这一半文件的副本数都减一
                         for(String file : halfReplicationSet){
-                            setReplicationInternalWithoutPermissionCheck(file,(short)(rep - 1));
+                            setDynamicReplication(file,(short)(rep - 1));
                         }
                         //更新rep文件集合中最小accessTimeFile
                         minAccessTimeFile.put(rep, replicationSet.get(replicationSet.size()/2));
@@ -4490,19 +4503,14 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                     //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
                     minAccessTimeFile.put(rep, src);
                     NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
-                    /*这里使用internal方法的原因是internal方法不记录EditLog，
-                    * 假如NameNode崩溃，重新启动时各个文件的副本数会重新设置为3，
-                    * 而动态副本类中的文件集合会重新初始化，两者正好相适应，
-                    * 如果记录了EditLog，各个文件的副本数有高有低，但是动态副本类中
-                    * 集合并没有相应的记录会出问题，后果包括如果文件不被访问，
-                    * 文件的副本数永远不会减少*/
-                    setReplicationInternalWithoutPermissionCheck(src,(short)rep);
+                    //使用修改后的setReplication函数
+                    setDynamicReplication(src,(short)rep);
                     return true;
                 }
                 else if(srcAccessTime >= dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
                     replicationSet.add(src);
                     NameNode.allocationLog.info(src + " was inserted into set " + rep);
-                    setReplicationInternalWithoutPermissionCheck(src,(short)rep);
+                    setDynamicReplication(src,(short)rep);
                     return true;
                 }
             }
