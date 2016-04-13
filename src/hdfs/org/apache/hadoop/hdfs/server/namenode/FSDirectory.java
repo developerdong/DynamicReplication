@@ -1340,7 +1340,11 @@ class FSDirectory implements FSConstants, Closeable {
             NameNode.allocationLog.info("access time precision is " + accessTimePrecision);
             NameNode.allocationLog.info("old access time of file " + src + " is " + inodeTime);
             NameNode.allocationLog.info("now access time of file " + src + " is " + atime);
-            if (atime <= inodeTime + accessTimePrecision && !force) {
+            if (force){
+                inode.setAccessTime(atime);
+                status = true;
+            }
+            else if (atime <= inodeTime + accessTimePrecision) {
                 status = false;
             } else {
                 //使用指数平均法来计算平均访问时间
