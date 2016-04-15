@@ -934,7 +934,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     private boolean setDynamicReplication(String src, short replication)
             throws IOException {
         boolean status = setDynamicReplicationInternal(src, replication);
-        getEditLog().logSync();
         if (status && auditLog.isInfoEnabled()) {
             logAuditEvent(UserGroupInformation.getCurrentUGI(),
                     Server.getRemoteIp(),
