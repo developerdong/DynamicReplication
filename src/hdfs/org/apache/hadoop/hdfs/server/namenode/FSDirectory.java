@@ -17,22 +17,30 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import java.io.*;
-import java.util.*;
-
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.permission.*;
-import org.apache.hadoop.metrics.MetricsRecord;
-import org.apache.hadoop.metrics.MetricsUtil;
-import org.apache.hadoop.metrics.MetricsContext;
-import org.apache.hadoop.hdfs.protocol.FSConstants;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.protocol.Block;
+import org.apache.hadoop.hdfs.protocol.ClientProtocol;
+import org.apache.hadoop.hdfs.protocol.FSConstants;
 import org.apache.hadoop.hdfs.protocol.QuotaExceededException;
 import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.namenode.BlocksMap.BlockInfo;
+import org.apache.hadoop.metrics.MetricsContext;
+import org.apache.hadoop.metrics.MetricsRecord;
+import org.apache.hadoop.metrics.MetricsUtil;
+
+import java.io.Closeable;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /*************************************************
  * FSDirectory stores the filesystem directory state.
@@ -471,6 +479,21 @@ class FSDirectory implements FSConstants, Closeable {
         return fileBlocks;
     }
 
+    Block[] setDynamicReplication(String src,
+                           short replication,
+                           int[] oldReplication
+    ) throws IOException {
+        waitForReady();
+        Block[] fileBlocks = unprotectedSetReplication(src, replication, oldReplication);
+        /* 这里不在EditLog中记录副本变化的原因是：
+         * 假如NameNode崩溃，重新启动时各个文件的副本数会重新设置为3，
+         * 而动态副本类中的文件集合会重新初始化，两者正好相适应，
+         * 如果记录了EditLog，各个文件的副本数有高有低，但是动态副本类中
+         * 集合并没有相应的记录会出问题
+         * */
+        return fileBlocks;
+    }
+
     Block[] unprotectedSetReplication(String src,
                                       short replication,
                                       int[] oldReplication
@@ -573,11 +596,21 @@ class FSDirectory implements FSConstants, Closeable {
         if (NameNode.stateChangeLog.isDebugEnabled()) {
             NameNode.stateChangeLog.debug("DIR* FSDirectory.delete: " + src);
         }
+        //先取出受影响的文件
+        FileStatus[] files = getListing(src);
         waitForReady();
         long now = FSNamesystem.now();
         INode deletedNode = unprotectedDelete(src, now);
         if (deletedNode != null) {
             fsImage.getEditLog().logDelete(src, now);
+            //删除成功则调用api尝试从动态集合中删除
+            if(files != null){
+                for(FileStatus file : files){
+                    if(!file.isDir()){
+                        namesystem.attemptToDeleteFileFromDynamicReplicationSet(file.getPath().toString(), file.getReplication());
+                    }
+                }
+            }
         }
         return deletedNode;
     }
@@ -603,7 +636,6 @@ class FSDirectory implements FSConstants, Closeable {
      * Update the count at each ancestor directory with quota
      * @param src a string representation of a path to an inode
      * @param modificationTime the time the inode is removed
-     * @param deletedBlocks the place holder for the blocks to be removed
      * @return if the deletion succeeds
      */
     INode unprotectedDelete(String src, long modificationTime) {
@@ -824,7 +856,7 @@ class FSDirectory implements FSConstants, Closeable {
      * @param nsDelta the delta change of namespace
      * @param dsDelta the delta change of diskspace
      * @throws QuotaExceededException if the new count violates any quota limit
-     * @throws FileNotFound if path does not exist.
+     * @throws FileNotFoundException if path does not exist.
      */
     void updateSpaceConsumed(String path, long nsDelta, long dsDelta)
             throws QuotaExceededException,
@@ -1158,7 +1190,6 @@ class FSDirectory implements FSConstants, Closeable {
      * with fixing the state, if there is a problem.
      *
      * @param dir the root of the tree that represents the directory
-     * @param counters counters for name space and disk space
      * @param nodesInPath INodes for the each of components in the path.
      * @return the size of the tree
      */
@@ -1316,13 +1347,38 @@ class FSDirectory implements FSConstants, Closeable {
         }
         if (atime != -1) {
             long inodeTime = inode.getAccessTime();
-
+            long accessTimePrecision = namesystem.getAccessTimePrecision();
+            //judge accessTimePrecision is bigger than top line or not
+            accessTimePrecision = accessTimePrecision<30000?accessTimePrecision:30000;
             // if the last access time update was within the last precision interval, then
             // no need to store access time
-            if (atime <= inodeTime + namesystem.getAccessTimePrecision() && !force) {
+            NameNode.allocationLog.info("access time precision is " + accessTimePrecision);
+            NameNode.allocationLog.info("old access time of file " + src + " is " + inodeTime);
+            NameNode.allocationLog.info("now access time of file " + src + " is " + atime);
+            if (force){
+                inode.setAccessTime(atime);
+                status = true;
+            }
+            else if (atime <= inodeTime + accessTimePrecision) {
                 status = false;
             } else {
-                inode.setAccessTime(atime);
+                //使用指数平均法来计算平均访问时间
+                long newAccessTime;
+                float alpha = namesystem.getAlpha();
+                //使用BigDecimal来精确计算
+                BigDecimal bigInodeTime = new BigDecimal(String.valueOf(inodeTime));
+                BigDecimal bigOne = new BigDecimal(String.valueOf(1));
+                BigDecimal bigAlpha = new BigDecimal(String.valueOf(alpha));
+                BigDecimal bigAtime = new BigDecimal(String.valueOf(atime));
+                newAccessTime = bigInodeTime.multiply(bigOne.subtract(bigAlpha)).add(bigAtime.multiply(bigAlpha)).longValue();
+
+                NameNode.allocationLog.info("new access time of file " + src + " is " + newAccessTime);
+                inode.setAccessTime(newAccessTime);
+
+                //尝试执行副本更新算法
+                NameNode.allocationLog.info("begin update replication of file " + src);
+                namesystem.allocateReplication(src, inode);
+                NameNode.allocationLog.info("end update replication of file " + src);
                 status = true;
             }
         }

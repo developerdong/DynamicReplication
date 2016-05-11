@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
+ * <p/>
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * <p/>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,9 +17,15 @@
  */
 package org.apache.hadoop.hdfs.server.namenode;
 
-import org.apache.commons.logging.*;
-
-import org.apache.hadoop.conf.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.permission.PermissionStatus;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.server.common.GenerationStamp;
@@ -27,49 +33,36 @@ import org.apache.hadoop.hdfs.server.common.HdfsConstants.StartupOption;
 import org.apache.hadoop.hdfs.server.common.Storage;
 import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.namenode.BlocksMap.BlockInfo;
+import org.apache.hadoop.hdfs.server.namenode.LeaseManager.Lease;
+import org.apache.hadoop.hdfs.server.namenode.UnderReplicatedBlocks.BlockIterator;
 import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMBean;
 import org.apache.hadoop.hdfs.server.namenode.metrics.FSNamesystemMetrics;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.UnixUserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.*;
+import org.apache.hadoop.hdfs.server.protocol.*;
+import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics.util.MBeanUtil;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.net.ScriptBasedMapping;
-import org.apache.hadoop.hdfs.server.namenode.LeaseManager.Lease;
-import org.apache.hadoop.hdfs.server.namenode.UnderReplicatedBlocks.BlockIterator;
-import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.BlocksWithLocations.BlockWithLocations;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeCommand;
-import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
-import org.apache.hadoop.hdfs.server.protocol.DisallowedDatanodeException;
-import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
-import org.apache.hadoop.hdfs.server.protocol.UpgradeCommand;
-import org.apache.hadoop.fs.ContentSummary;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.*;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.io.IOUtils;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.DataOutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.*;
-import java.util.Map.Entry;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UnixUserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.HostsFileReader;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.StringUtils;
 
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import javax.security.auth.login.LoginException;
+import java.io.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.util.*;
+import java.util.Map.Entry;
 
 /***************************************************
  * FSNamesystem does the actual bookkeeping work for the
@@ -284,6 +277,30 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     // precision of access times.
     private long accessTimePrecision = 0;
 
+    //指数平均法中灵敏度alpha
+    private float alpha;
+
+    //最大动态副本
+    private int maxDynamicReplication;
+
+    //最小动态副本
+    private int minDynamicReplication;
+
+    //存储空间使用上限
+    private float capacityUsedPercentTop;
+
+    //动态副本类
+    private DynamicReplicationMonitor dynamicReplicationMonitor;
+
+    //执行副本分配算法
+    public void allocateReplication(String src,INodeFile inode) throws IOException {
+        this.dynamicReplicationMonitor.allocateReplication(src, inode);
+    }
+
+    //尝试删除
+    public boolean attemptToDeleteFileFromDynamicReplicationSet(String src, int rep){
+        return this.dynamicReplicationMonitor.deleteFileFromOldSet(src, rep);
+    }
     /**
      * FSNamesystem constructor.
      */
@@ -303,6 +320,8 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     private void initialize(NameNode nn, Configuration conf) throws IOException {
         this.systemStart = now();
         setConfigurationParameters(conf);
+
+        this.dynamicReplicationMonitor = new DynamicReplicationMonitor(maxDynamicReplication, minDynamicReplication, capacityUsedPercentTop);
 
         this.nameNodeAddress = nn.getNameNodeAddress();
         this.registerMBean(conf); // register the MBean for the FSNamesystemStutus
@@ -405,7 +424,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 conf.getBoolean("dfs.replication.considerLoad", true),
                 this,
                 clusterMap);
+
+        this.alpha = conf.getFloat("dfs.dynamic.alpha",0.5f);
+        this.capacityUsedPercentTop = conf.getFloat("dfs.dynamic.top", 80.0f);
+        this.maxDynamicReplication = conf.getInt("dfs.dynamic.max", 6);
+        //this.minDynamicReplication = conf.getInt("dfs.dynamic.min", 3);
         this.defaultReplication = conf.getInt("dfs.replication", 3);
+        this.minDynamicReplication = this.defaultReplication;
         this.maxReplication = conf.getInt("dfs.replication.max", 512);
         this.minReplication = conf.getInt("dfs.replication.min", 1);
         if (minReplication <= 0)
@@ -435,7 +460,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         this.maxFsObjects = conf.getLong("dfs.max.objects", 0);
         this.blockInvalidateLimit = Math.max(this.blockInvalidateLimit,
                 20 * (int) (heartbeatInterval / 1000));
-        this.accessTimePrecision = conf.getLong("dfs.access.time.precision", 0);
+        this.accessTimePrecision = conf.getLong("dfs.access.time.precision", 60000);
         this.supportAppends = conf.getBoolean("dfs.support.append", false);
     }
 
@@ -564,7 +589,9 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
     long getAccessTimePrecision() {
         return accessTimePrecision;
     }
-
+    float getAlpha(){
+        return alpha;
+    }
     private boolean isAccessTimeSupported() {
         return accessTimePrecision > 0;
     }
@@ -904,6 +931,17 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         return status;
     }
 
+    private boolean setDynamicReplication(String src, short replication)
+            throws IOException {
+        boolean status = setDynamicReplicationInternal(src, replication);
+        if (status && auditLog.isInfoEnabled()) {
+            logAuditEvent(UserGroupInformation.getCurrentUGI(),
+                    Server.getRemoteIp(),
+                    "setReplication", src, null, null);
+        }
+        return status;
+    }
+
     private synchronized boolean setReplicationInternal(String src,
                                                         short replication
     ) throws IOException {
@@ -917,6 +955,41 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         int[] oldReplication = new int[1];
         Block[] fileBlocks;
         fileBlocks = dir.setReplication(src, replication, oldReplication);
+        if (fileBlocks == null)  // file not found or is a directory
+            return false;
+        int oldRepl = oldReplication[0];
+        if (oldRepl == replication) // the same replication
+            return true;
+
+        // update needReplication priority queues
+        for (int idx = 0; idx < fileBlocks.length; idx++)
+            updateNeededReplications(fileBlocks[idx], 0, replication - oldRepl);
+
+        if (oldRepl > replication) {
+            // old replication > the new one; need to remove copies
+            LOG.info("Reducing replication for file " + src
+                    + ". New replication is " + replication);
+            for (int idx = 0; idx < fileBlocks.length; idx++)
+                processOverReplicatedBlock(fileBlocks[idx], replication, null, null);
+        } else { // replication factor is increased
+            LOG.info("Increasing replication for file " + src
+                    + ". New replication is " + replication);
+        }
+        return true;
+    }
+
+    private synchronized boolean setDynamicReplicationInternal(String src,
+                                                        short replication
+    ) throws IOException {
+        if (isInSafeMode())
+            throw new SafeModeException("Cannot set replication for " + src, safeMode);
+        verifyReplication(src, replication, null);
+
+        /*no permission check*/
+
+        int[] oldReplication = new int[1];
+        Block[] fileBlocks;
+        fileBlocks = dir.setDynamicReplication(src, replication, oldReplication);
         if (fileBlocks == null)  // file not found or is a directory
             return false;
         int oldRepl = oldReplication[0];
@@ -1475,7 +1548,6 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
 
     /**
      * Remove a datanode from the invalidatesSet
-     * @param n datanode
      */
     void removeFromInvalidates(String storageID) {
         Collection<Block> blocks = recentInvalidateSets.remove(storageID);
@@ -1535,7 +1607,7 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
         if (size == 0) {
             return;
         }
-        for (Map.Entry<String, Collection<Block>> entry : recentInvalidateSets.entrySet()) {
+         for (Map.Entry<String, Collection<Block>> entry : recentInvalidateSets.entrySet()) {
             Collection<Block> blocks = entry.getValue();
             if (blocks.size() > 0) {
                 out.println(datanodeMap.get(entry.getKey()).getName() + blocks);
@@ -2656,12 +2728,13 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 continue;
             }
             if (srcNode.isDecommissionInProgress())
-                continue;
-            // switch to a different node randomly
+                continue;//如果有DECOMMISSION_INPROGRESS状态的node被选中，则下面的负载比较就不会进行
+            // switch to a different node with lowest XceiverCount
             // this to prevent from deterministically selecting the same node even
             // if the node failed to replicate the block on previous iterations
-            if (r.nextBoolean())
+            if (node.getXceiverCount() < srcNode.getXceiverCount())
                 srcNode = node;
+            //当没有DECOMMISSION_INPROGRESS状态节点时，选择负载最低的节点
         }
         if (numReplicas != null)
             numReplicas.initialize(live, decommissioned, corrupt, excess);
@@ -4310,6 +4383,192 @@ public class FSNamesystem implements FSConstants, FSNamesystemMBean {
                 throw new RuntimeException(msg, es);
             }
             smmthread = null;
+        }
+    }
+
+    class DynamicReplicationMonitor {
+        //动态副本调整的最大值
+        int maxDynamicReplication;
+        //动态副本调整的最小值
+        int minDynamicReplication;
+        //动态副本调整空间上限，达到这个值应该减少副本数
+        float capacityUsedPercentTop;
+        //保存不同优先级的集合，最高优先级集合中文件副本数为dynamicMax，最低优先级集合中文件副本数为dynamicMin+1
+        Hashtable<Integer,LinkedList<String>> replicationSets;
+        //保存每个集合中指数平均访问时间最小的文件
+        Hashtable<Integer,String> minAccessTimeFile;
+        //比较器用来比较两个文件之间指数平均访问时间的大小
+        Comparator<String> accessTimeComparator = new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2){
+                return (int)(dir.getFileINode(o1).getAccessTime()-dir.getFileINode(o2).getAccessTime());
+            }
+        };
+        DynamicReplicationMonitor(int maxDynamicReplication, int minDynamicReplication, float capacityUsedPercentTop){
+            this.initialize(maxDynamicReplication, minDynamicReplication,capacityUsedPercentTop);
+        }
+        void initialize(int maxDynamicReplication,int minDynamicReplication,float capacityUsedPercentTop){
+            this.maxDynamicReplication = maxDynamicReplication;
+            this.minDynamicReplication = minDynamicReplication;
+            this.capacityUsedPercentTop = capacityUsedPercentTop;
+            this.replicationSets = new Hashtable<Integer, LinkedList<String>>();
+            for(int i = minDynamicReplication+1;i <= maxDynamicReplication;i++){
+                replicationSets.put(i,new LinkedList<String>());
+            }
+            this.minAccessTimeFile = new Hashtable<Integer, String>();
+
+        }
+
+        /**
+         * 更新被访问文件的副本数
+         */
+        void allocateReplication(String src, INodeFile inode) throws IOException{
+            //对于只有一块的小文件，不进行调整
+            if(inode.getBlocks().length == 1){
+                NameNode.allocationLog.info("the block numbers of " + src + " is one,don't change its replication");
+                return;
+            }
+
+            //获取文件信息
+            int srcReplication = inode.getReplication();
+            long srcAccessTime = inode.getAccessTime();
+
+            //插入成功且副本数不是最小副本数则在原集合中删除
+            if((insertFileIntoNewSet(src, srcReplication, srcAccessTime))&&(srcReplication > minDynamicReplication)){
+                replicationSets.get(srcReplication).remove(src);
+                NameNode.allocationLog.info(src + " was removed from set " + srcReplication);
+            }
+
+
+            //如果是最小文件则更新最小文件
+            if((srcReplication > minDynamicReplication)&&(minAccessTimeFile.get(srcReplication).equals(src))) {
+                updateMinAccessTimeFileOfSet(srcReplication);
+            }
+
+
+
+            //对空间是否达到上限进行判断处理
+            NameNode.allocationLog.info("before check capacity");
+            NameNode.allocationLog.info("capacity remaing is " + getCapacityRemainingPercent());
+            if( (100 - getCapacityRemainingPercent()) > capacityUsedPercentTop){
+                NameNode.allocationLog.info("begin to decrease capacity use");
+                //从低副本集合向高副本集合扫描
+                for(int rep = minDynamicReplication +1; rep <= maxDynamicReplication; rep++){
+                    //获得文件集合，集合中每个文件副本数为rep
+                    LinkedList<String> replicationSet = replicationSets.get(rep);
+                    if (!replicationSet.isEmpty()){
+                        //对集合进行排序，选取accessTime最小的那一半文件
+                        replicationSet.sort(accessTimeComparator);
+                        ArrayList<String> halfReplicationSet =  new ArrayList<String>(replicationSet.subList(0,replicationSet.size()/2));
+                        //这一半文件的副本数都减一
+                        for(String file : halfReplicationSet){
+                            //修改副本数成功后才把文件转移到更低副本的集合
+                            if(setDynamicReplication(file,(short)(rep - 1))){
+                                //从原集合移除这一文件
+                                if(replicationSet.remove(file)){
+                                    //如果不是最后一个集合，那么该文件加入副本数更小的集合
+                                    if(rep > minDynamicReplication +1){
+                                        replicationSets.get(rep-1).add(file);
+                                    }
+                                }
+
+                            }
+                        }
+                        //更新rep文件集合中最小accessTimeFile
+                        minAccessTimeFile.put(rep, replicationSet.get(0));
+                    }
+                }
+                NameNode.allocationLog.info("end decreasing capacity use");
+            }
+            NameNode.allocationLog.info("after check capacity");
+        }
+        /**
+         * 尝试将文件插入新集合，成功插入则返回true，accessTime太小不满足插入条件就返回false
+         */
+        private boolean insertFileIntoNewSet(String src, int srcReplication, long srcAccessTime) throws IOException{
+            if(src.isEmpty()){
+                return false;
+            }
+            //遍历比srcReplication副本数大的集合，尝试插入
+            for(int rep = maxDynamicReplication; rep >= srcReplication+1 ; rep--){
+                NameNode.allocationLog.info("begin to scan set " + rep);
+                LinkedList<String> replicationSet = replicationSets.get(rep);
+
+                if(!replicationSet.isEmpty()){
+                    NameNode.allocationLog.info("min access time file of set " + rep + " is " + minAccessTimeFile.get(rep));
+                    NameNode.allocationLog.info("min access time of set " + rep + " is " + dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime());
+                }
+
+                //集合为空或者访问时间大于等于集合中最小访问时间就进行插入
+                if(replicationSet.isEmpty()){
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        //插入新集合
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        //如果集合为空则src是第一个插入的文件，所以最小acessTime文件设置为src
+                        minAccessTimeFile.put(rep, src);
+                        NameNode.allocationLog.info(src + " is the minAccessTimeFile of set " + rep);
+                        return true;
+                    }
+
+                }
+                else if(srcAccessTime >= dir.getFileInfo(minAccessTimeFile.get(rep)).getAccessTime()){
+                    //修改副本数成功才插入相应集合
+                    if(setDynamicReplication(src,(short)rep)){
+                        replicationSet.add(src);
+                        NameNode.allocationLog.info(src + " was inserted into set " + rep);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        /**
+         * 尝试将文件从动态集合中删除
+         */
+        private boolean deleteFileFromOldSet(String src, int rep){
+            if(src.isEmpty()){
+                return false;
+            }
+            boolean result = false;
+            if((rep > minReplication)&&(rep <= maxReplication)){
+                LinkedList<String> replicationSet = replicationSets.get(rep);
+                if(replicationSet != null){
+                    result = replicationSet.remove(src);
+                    if(minAccessTimeFile.get(rep).equals(src)){
+                        updateMinAccessTimeFileOfSet(rep);
+                    }
+                }
+            }
+            return result;
+        }
+        /**
+         * 更新rep对应集合中accessTime最小的文件
+         */
+        private boolean updateMinAccessTimeFileOfSet(int rep){
+            //先保存最初的最小文件
+            String oldFile = minAccessTimeFile.get(rep);
+            String newFile = "";
+            //先把minAccessTime设为最大值
+            long minAccessTime = Long.MAX_VALUE;
+            //遍历集合，寻找是否有更小的元素
+            for(String file:replicationSets.get(rep)){
+                FileStatus fileInfo = dir.getFileInfo(file);
+                if(fileInfo != null){
+                    if(fileInfo.getAccessTime() < minAccessTime){
+                        newFile = file;
+                        minAccessTime = fileInfo.getAccessTime();
+                    }
+                }
+
+            }
+            if(!newFile.equals(oldFile)){
+                minAccessTimeFile.put(rep, newFile);
+                NameNode.allocationLog.info(newFile + " is the new minAccessTimeFile of set " + rep);
+                return true;
+            }
+            return false;
         }
     }
 

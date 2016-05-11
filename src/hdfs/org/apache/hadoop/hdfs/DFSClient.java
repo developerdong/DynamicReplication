@@ -17,16 +17,15 @@
  */
 package org.apache.hadoop.hdfs;
 
-import org.apache.hadoop.io.*;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryProxy;
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4FastDecompressor;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.ipc.*;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.NodeBase;
-import org.apache.hadoop.conf.*;
 import org.apache.hadoop.hdfs.DistributedFileSystem.DiskStatus;
 import org.apache.hadoop.hdfs.protocol.*;
 import org.apache.hadoop.hdfs.protocol.DataTransferProtocol.PipelineAck;
@@ -35,23 +34,35 @@ import org.apache.hadoop.hdfs.server.common.UpgradeStatusReport;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException;
+import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UnixUserGroupInformation;
-import org.apache.hadoop.util.*;
-
-import org.apache.commons.logging.*;
-
-import java.io.*;
-import java.net.*;
-import java.util.*;
-import java.util.zip.CRC32;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ConcurrentHashMap;
-import java.nio.BufferOverflowException;
-import java.nio.ByteBuffer;
+import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.StringUtils;
 
 import javax.net.SocketFactory;
 import javax.security.auth.login.LoginException;
+import java.io.*;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.CRC32;
 
 /********************************************************
  * DFSClient can connect to a Hadoop Filesystem and 
@@ -1127,6 +1138,8 @@ public class DFSClient implements FSConstants, java.io.Closeable {
         private boolean gotEOS = false;
 
         byte[] skipBuf = null;
+        byte[] dataBuf = null;
+        private int dataOff;
         ByteBuffer checksumBytes = null;
         int dataLeft = 0;
         boolean isLastPacket = false;
@@ -1272,7 +1285,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 }
 
                 int dataLen = in.readInt();
-
+                int compressedDataLen = in.readInt();
                 // Sanity check the lengths
                 if (dataLen < 0 ||
                         ((dataLen % bytesPerChecksum) != 0 && !lastPacketInBlock) ||
@@ -1291,6 +1304,20 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 if (dataLen > 0) {
                     IOUtils.readFully(in, checksumBytes.array(), 0,
                             checksumBytes.limit());
+
+                    dataBuf = new byte[dataLen];
+                    dataOff = 0;
+                    if(dataLen == compressedDataLen){
+                        IOUtils.readFully(in, dataBuf, 0,
+                                dataLen);
+                    }
+                    else{
+                        byte[] compressedDataBuf = new byte[compressedDataLen];
+                        IOUtils.readFully(in, compressedDataBuf, 0,
+                                compressedDataLen);
+                        LZ4FastDecompressor decompressor = LZ4Factory.fastestInstance().fastDecompressor();
+                        decompressor.decompress(compressedDataBuf, 0, dataBuf, 0, dataLen);
+                    }
                 }
             }
 
@@ -1298,7 +1325,8 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
             if (chunkLen > 0) {
                 // len should be >= chunkLen
-                IOUtils.readFully(in, buf, offset, chunkLen);
+                System.arraycopy(dataBuf, dataOff, buf, offset, chunkLen);
+                dataOff += chunkLen;
                 checksumBytes.get(checksumBuf, 0, checksumSize);
             }
 
@@ -2170,7 +2198,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 buffer = null;
                 buf = new byte[pktSize];
 
-                checksumStart = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER;
+                checksumStart = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
                 checksumPos = checksumStart;
                 dataStart = checksumStart + chunksPerPkt * checksum.getChecksumSize();
                 dataPos = dataStart;
@@ -2208,6 +2236,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 //prepare the header and close any gap between checksum and data.
 
                 int dataLen = dataPos - dataStart;
+                int compressedDataLen = dataLen;
                 int checksumLen = checksumPos - checksumStart;
 
                 if (checksumPos != dataStart) {
@@ -2217,8 +2246,31 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                     System.arraycopy(buf, checksumStart, buf,
                             dataStart - checksumLen, checksumLen);
                 }
+                // pktLen 初始值为未压缩时包长度（不包括header）
+                int pktLen = SIZE_OF_INTEGER * 2 + dataLen + checksumLen;
 
-                int pktLen = SIZE_OF_INTEGER + dataLen + checksumLen;
+                /* 如果不是本地传输，就尝试压缩；
+                 * 否则不尝试压缩
+                 */
+                if (!s.getInetAddress().getHostAddress().equals(s.getLocalAddress().getHostAddress())){
+                    NameNode.compressionLog.info("DFSClient: remote transfer");
+                    LZ4Compressor compressor = LZ4Factory.fastestInstance().fastCompressor();
+                    int maxCompressedLength = compressor.maxCompressedLength(dataLen);
+                    byte[] compressedBuf = new byte[maxCompressedLength];
+                    compressedDataLen = compressor.compress(buf, dataStart, dataLen, compressedBuf, 0);
+                    //如果压缩后长度变短，就进行数据复制
+                    if(compressedDataLen < dataLen){
+                        NameNode.compressionLog.info("DFSClient: use compression");
+                        pktLen = SIZE_OF_INTEGER * 2 + compressedDataLen + checksumLen;
+                        System.arraycopy(compressedBuf, 0, buf, dataStart, compressedDataLen);
+                    }
+                    else{
+                        NameNode.compressionLog.info("DFSClient: dont't use compression");
+                        compressedDataLen = dataLen;
+                    }
+                }
+
+
 
                 //normally dataStart == checksumPos, i.e., offset is zero.
                 buffer = ByteBuffer.wrap(buf, dataStart - checksumPos,
@@ -2235,7 +2287,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
                 buffer.put((byte) ((lastPacketInBlock) ? 1 : 0));
                 //end of pkt header
                 buffer.putInt(dataLen); // actual data length, excluding checksum.
-
+                buffer.putInt(compressedDataLen); // compressed data length.
                 buffer.reset();
                 return buffer;
             }
@@ -2794,7 +2846,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
         private void computePacketChunkSize(int psize, int csize) {
             int chunkSize = csize + checksum.getChecksumSize();
-            int n = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER;
+            int n = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2;
             chunksPerPacket = Math.max((psize - n + chunkSize - 1) / chunkSize, 1);
             packetSize = n + chunkSize * chunksPerPacket;
             if (LOG.isDebugEnabled()) {
@@ -3293,7 +3345,7 @@ public class DFSClient implements FSConstants, java.io.Closeable {
 
         synchronized void setChunksPerPacket(int value) {
             chunksPerPacket = Math.min(chunksPerPacket, value);
-            packetSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER +
+            packetSize = DataNode.PKT_HEADER_LEN + SIZE_OF_INTEGER * 2 +
                     (checksum.getBytesPerChecksum() +
                             checksum.getChecksumSize()) * chunksPerPacket;
         }
