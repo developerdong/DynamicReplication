@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/hadoop-0.20.2.iml" filepath="$PROJECT_DIR$/hadoop-0.20.2.iml" />
+      <module fileurl="file://$PROJECT_DIR$/DynamicReplication.iml" filepath="$PROJECT_DIR$/DynamicReplication.iml" />
     </modules>
   </component>
 </project>
